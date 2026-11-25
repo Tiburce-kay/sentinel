@@ -43,7 +43,7 @@ $PY -m pytest -q -p no:cacheprovider tests > /tmp/pytest.log 2>&1 || { tail -30 
 ok "$(tail -1 /tmp/pytest.log)"
 
 echo "=== 3. assistant graphique (démonstration, écran virtuel)"
-GSK_RENDERER=cairo GDK_BACKEND=x11 timeout 60 xvfb-run -a -s "-screen 0 1024x768x24" \
+GTK_IM_MODULE=gtk-im-context-simple GSK_RENDERER=cairo GDK_BACKEND=x11 timeout 60 xvfb-run -a -s "-screen 0 1024x768x24" \
     sentinel-setup --demo --snapshot /tmp/snap > /tmp/gui.log 2>&1 || true
 pages=$(grep '^page: ' /tmp/gui.log | cut -d' ' -f2 | sort -u | tr '\n' ' ')
 for p in welcome capture verify confirm done; do
