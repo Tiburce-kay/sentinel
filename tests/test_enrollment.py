@@ -138,8 +138,17 @@ def test_visage_non_vivant_refuse():
 
 
 def test_seuil_personnel_borne_par_le_plafond():
+    """Enrôlement en conditions idéales : le seuil n'est jamais durci au-delà du seuil validé."""
     _, out = run(session(), live=8.0)
-    assert out.ok and out.liveness_threshold == 1.0
+    assert out.ok and out.liveness_threshold == -1.0
+
+
+def test_encore_un_peu():
+    sess = session()
+    for _ in range(6):
+        sess.feed(Shot(ME, 1.0))
+    ev = sess.feed(Shot(ME, 1.0, yaw_deg=9))   # à mi-chemin de la pose « gauche »
+    assert ev.step == "gauche" and ev.hint == "Encore un peu"
 
 
 def test_seuil_personnel_borne_par_le_plancher():

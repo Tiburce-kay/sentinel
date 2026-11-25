@@ -69,3 +69,27 @@ différents : elle invaliderait cette calibration. Elle n'est pas retenue pour l
 - La vidéo n'a été détectée comme visage que sur 18 images sur 225 : l'attaque doit
   être refaite plus près.
 - **En pénombre, aucune image n'est exploitable** : l'éclairage par l'écran est prévu.
+
+## Calibration automatique à l'enrôlement (mise à jour du 25/11/2026)
+
+Deux enrôlements réels avec l'assistant graphique :
+
+| Essai | Relief | Vivant (médiane / 10e centile) | Seuil personnel calculé |
+|---|---|---|---|
+| 1 (éclairage de la pièce) | 0,152 | +2,66 / +0,01 | −0,49 |
+| 2 (écran blanc plein écran) | 0,101 | +2,68 / +0,64 | +0,14 |
+
+**Constat :** l'enrôlement se fait en conditions idéales (de face, bien éclairé, écran
+blanc), qui gonflent les scores. Un seuil personnel plus strict que le seuil validé
+(−1,0) refuse ensuite l'utilisateur dans les conditions ordinaires : vérification en
+3,5 s sur un maximum de 4 s, et, d'après la séance en éclairage normal, une grande part
+des fenêtres refusées avec un seuil de +0,14.
+
+**Règle retenue :** le seuil personnel est `10e centile − 0,5`, borné entre le plancher
+(−2,0) et le **seuil validé (−1,0)**. La calibration n'assouplit que pour les webcams
+qui donnent des scores bas ; elle ne durcit jamais.
+
+Angles mesurés lors de l'essai 2 (écart à la position de face) : gauche +0,149,
+droite −0,223, haut −0,083, bas +0,134 (lacet, puis tangage). Les quatre directions sont
+reconnues dans le bon sens ; le seuil de tangage passe de 0,08 à 0,06, « haut » ayant
+été atteint de justesse.

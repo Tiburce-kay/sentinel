@@ -95,6 +95,18 @@ class EnrollmentSession:
         ref, ec = self.reference_pose, self.ec
         return abs(pose.yaw - ref.yaw) < ec.yaw_delta / 2 and abs(pose.pitch - ref.pitch) < ec.pitch_delta / 2
 
+    def _halfway(self, pose: Pose) -> bool:
+        """Mouvement dans la bonne direction, mais pas encore assez ample."""
+        ref, ec = self.reference_pose, self.ec
+        dy, dp = pose.yaw - ref.yaw, pose.pitch - ref.pitch
+        return {
+            "face": False,
+            "gauche": dy > ec.yaw_delta / 2,
+            "droite": dy < -ec.yaw_delta / 2,
+            "haut": dp < -ec.pitch_delta / 2,
+            "bas": dp > ec.pitch_delta / 2,
+        }[self.step]
+
     def _pose_reached(self, pose: Pose) -> bool:
         ref, ec = self.reference_pose, self.ec
         if self.step == "face":
@@ -145,7 +157,7 @@ class EnrollmentSession:
                 self.armed = True
             return self._event("", face.box)
         if not self._pose_reached(pose):
-            return self._event("", face.box)
+            return self._event("Encore un peu" if self._halfway(pose) else "", face.box)
         if self.step != "face":
             self.parallaxes[self.step].append(parallax(self.reference_pts, pts))
         kept = self.per_step[self.step]
