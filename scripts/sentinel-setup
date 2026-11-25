@@ -1,0 +1,7 @@
+#!/bin/sh
+# Lance l'assistant graphique depuis le dépôt (développement).
+# L'interface utilise le Python du système, qui fournit GTK4 et libadwaita.
+#   scripts/sentinel-setup --socket dev-data/sentinel.sock   # avec le service de dev
+#   scripts/sentinel-setup --demo                            # démonstration sans caméra
+here="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHONPATH="$here/src${PYTHONPATH:+:$PYTHONPATH}" exec /usr/bin/python3 -m sentinel.gui "$@"

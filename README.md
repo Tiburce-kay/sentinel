@@ -7,13 +7,22 @@ pas de caméra infrarouge, enregistrent parfois des images de l'utilisateur, et
 stockent des gabarits qu'un attaquant peut remplacer. Sentinel part de ces faiblesses
 documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 
-> ⚠️ **Projet en développement (phase 2/6).** Le branchement sur `sudo` et l'écran de
-> connexion n'est pas encore fait. Le mot de passe restera toujours disponible.
+> ⚠️ **Projet en développement.** Moteur, service et assistant graphique sont prêts ; le
+> branchement sur `sudo` et l'écran de verrouillage est l'étape suivante. Le mot de passe
+> restera toujours disponible.
+
+| Accueil | Enregistrement guidé | Choix et confirmation |
+|---|---|---|
+| ![](docs/images/assistant-welcome.png) | ![](docs/images/assistant-capture.png) | ![](docs/images/assistant-confirm.png) |
 
 ## Ce qui le distingue
 
-- **Détection du vivant** : un modèle d'IA distingue la peau d'une photo ou d'un écran.
-  Défi aléatoire et reflet de couleurs de l'écran en préparation.
+- **Détection du vivant** : un modèle d'IA distingue la peau d'une photo ou d'un écran,
+  décidée sur une moyenne glissante calibrée sur du matériel réel.
+- **Enregistrement guidé en 5 poses** (face, gauche, droite, haut, bas) qui mesure le
+  **relief 3D** du visage : une photo, plate, ne peut pas être enregistrée.
+- **Calibration automatique** du seuil pour chaque personne et chaque webcam, toujours
+  bornée par un plancher de sécurité.
 - **Aucune image stockée.** Uniquement des empreintes numériques chiffrées en AES-256-GCM,
   liées au compte : un gabarit déplacé, modifié ou fabriqué ailleurs est refusé.
 - **Caméra vérifiée** : caméras virtuelles refusées, identité de la webcam épinglée.
@@ -34,6 +43,11 @@ export SENTINEL_CONFIG=config.dev.toml        # stockage local, sans root
 .venv/bin/sentinel calibrate reel             # mesure les scores (voir docs/CALIBRATION.md)
 
 .venv/bin/python -m pytest                    # 81 tests
+
+# Service + assistant graphique (deux terminaux)
+.venv/bin/sentineld                           # terminal 1
+scripts/sentinel-setup --socket dev-data/sentinel.sock   # terminal 2
+scripts/sentinel-setup --demo                 # démonstration, sans caméra
 ```
 
 ## Modèles

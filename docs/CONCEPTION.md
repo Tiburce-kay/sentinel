@@ -124,7 +124,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 2 | Moteur : caméra, détection, empreinte, vivant (texture), stockage chiffré, CLI, calibration | ✔ (calibré sur le T570) |
 | 2b | Défi aléatoire actif ; reflet d'une séquence de couleurs de l'écran | à faire |
 | 3a | Service `sentineld` : socket Unix, identité par SO_PEERCRED + logind, mot de passe via PAM, verrouillage, « mot de passe au démarrage » | ✔ |
-| 3b | Assistant graphique d'enrôlement (GTK4) | en cours |
+| 3b | Assistant graphique d'enrôlement (GTK4) : 5 poses, relief, calibration, vérification, confirmation par mot de passe | ✔ (à essayer avec la caméra) |
 | 3c | Module `pam_sentinel.so`, paquet, service systemd isolé ; `sudo` | à faire |
 | 4 | Écran de verrouillage, GDM, verrouillage automatique en cas d'absence | à faire |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
