@@ -1,0 +1,5 @@
+# Configuration de DÉVELOPPEMENT : stockage dans le dépôt, sans exiger root.
+# Usage : SENTINEL_CONFIG=config.dev.toml sentinel doctor
+data_dir = "dev-data/store"
+models_dir = "models"
+strict_permissions = false
