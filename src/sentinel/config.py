@@ -49,6 +49,14 @@ class LivenessConfig:
     # sur une webcam ordinaire ; la moyenne sépare nettement vrai visage et attaque.
     # Valeur calibrée sur le matériel réel : voir docs/CALIBRATION.md.
     threshold: float = -1.0
+    # Bornes de la calibration automatique à l'enrôlement : le seuil personnel de
+    # chaque utilisateur reste toujours entre ces deux valeurs. Le plancher protège
+    # contre une adaptation qui rendrait le système plus facile à tromper (pire
+    # attaque mesurée : -3,45 ; voir docs/CALIBRATION.md). Provisoire : à valider
+    # sur plusieurs webcams et plusieurs personnes.
+    floor: float = -2.0
+    ceiling: float = 1.0
+    calibration_margin: float = 0.5
     # Facteur d'agrandissement du cadre du visage (identique à l'entraînement du modèle).
     bbox_expansion: float = 1.5
 
@@ -75,8 +83,12 @@ class AuthConfig:
 
 @dataclass
 class EnrollConfig:
-    samples: int = 8
-    timeout_s: float = 30.0
+    per_pose: int = 2               # empreintes retenues par pose (5 poses)
+    timeout_s: float = 60.0
+    yaw_delta: float = 0.10         # rotation gauche/droite exigée (voir geometry.Pose)
+    pitch_delta: float = 0.08       # rotation haut/bas exigée
+    # Relief minimal (parallaxe du nez) : une photo inclinée reste plate. Provisoire.
+    min_parallax: float = 0.05
 
 
 @dataclass

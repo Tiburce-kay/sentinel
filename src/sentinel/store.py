@@ -53,6 +53,8 @@ class Enrollment:
     user: str
     embeddings: np.ndarray                 # (n, 128) float32, normalisées
     camera: str = ""                       # identité de la caméra d'enrôlement
+    liveness_threshold: float | None = None  # seuil personnel issu de la calibration
+    stats: dict = field(default_factory=dict)
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
 
@@ -156,6 +158,8 @@ class TemplateStore:
             "embeddings": _b64(emb.tobytes()),
             "count": int(emb.shape[0]),
             "camera": enr.camera,
+            "liveness_threshold": enr.liveness_threshold,
+            "stats": enr.stats,
             "created": enr.created,
             "updated": time.time(),
         }).encode()
@@ -188,6 +192,8 @@ class TemplateStore:
         data = json.loads(payload)
         emb = np.frombuffer(_unb64(data["embeddings"]), dtype=np.float32).reshape(data["count"], 128)
         return Enrollment(user=user, embeddings=emb.copy(), camera=data["camera"],
+                          liveness_threshold=data.get("liveness_threshold"),
+                          stats=data.get("stats", {}),
                           created=data["created"], updated=data["updated"])
 
     def remove(self, user: str) -> bool:

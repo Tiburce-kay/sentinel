@@ -117,42 +117,6 @@ def test_seuil_strict_refuse():
     assert r.status is Status.NO_MATCH
 
 
-def test_enrolement_collecte_des_empreintes_variees():
-    e = engine(enroll__samples=4)
-    rng = np.random.default_rng(0)
-
-    def frames():
-        for _ in range(200):
-            v = ME + rng.normal(scale=0.04, size=128).astype(np.float32)
-            yield Scene(v / np.linalg.norm(v))
-
-    out = e.enroll(frames())
-    assert out.shape == (4, 128)
-    assert all(abs(np.linalg.norm(v) - 1) < 1e-5 for v in out)
-
-
-def test_enrolement_refuse_plusieurs_visages_et_photo():
-    msgs = []
-    out = engine().enroll([Scene(ME, faces=2)] * 5, msgs.append)
-    assert len(out) == 0 and any("plusieurs visages" in m for m in msgs)
-    rng = np.random.default_rng(0)
-    photo = []
-    for _ in range(100):
-        v = ME + rng.normal(scale=0.04, size=128).astype(np.float32)
-        photo.append(Scene(v / np.linalg.norm(v), live=-6.0))
-    msgs.clear()
-    out = engine().enroll(photo, msgs.append)
-    assert len(out) == 0 and any("non vivant" in m for m in msgs)
-
-
-def test_enrolement_refuse_un_changement_de_personne():
-    msgs = []
-    seq = [Scene(ME)] + [Scene(OTHER)] * 5
-    out = engine().enroll(seq, msgs.append)
-    assert len(out) == 1
-    assert any("visage différent" in m for m in msgs)
-
-
 def test_photo_sans_fenetre_complete_signalee_comme_usurpation():
     """Cas réel : photo tenue de loin, fenêtre jamais complète, scores très bas."""
     seq = ([Scene(ME, live=-7.0)] * 4 + [Scene(None)]) * 10
@@ -162,3 +126,12 @@ def test_photo_sans_fenetre_complete_signalee_comme_usurpation():
 def test_vrai_visage_interrompu_reste_un_delai():
     seq = ([Scene(ME, live=1.0)] * 4 + [Scene(None)]) * 10
     assert engine().authenticate(seq, T).status is Status.TIMEOUT
+
+
+def test_seuil_personnel_applique_et_borne():
+    seq = [Scene(ME, live=-1.5)] * 15
+    assert not engine().authenticate(seq, T).ok                      # seuil global -1,0
+    assert engine().authenticate(seq, T, liveness_threshold=-1.8).ok  # seuil personnel
+    # Un seuil personnel sous le plancher (-2,0) est ramené au plancher.
+    r = engine().authenticate([Scene(ME, live=-2.5)] * 15, T, liveness_threshold=-9.0)
+    assert not r.ok and r.liveness_threshold == -2.0

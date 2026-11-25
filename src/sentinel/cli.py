@@ -84,26 +84,43 @@ def cmd_doctor(cfg: Config, args) -> int:
 
 
 def cmd_enroll(cfg: Config, args) -> int:
+    from .enrollment import EnrollmentSession
+
     user = _target_user(args)
     store = TemplateStore(cfg.data_dir, cfg.strict_permissions)
     store.check_permissions()
-    engine = _engine(cfg)
-    print(f"Enrôlement de « {user} » : regardez la caméra, bougez légèrement la tête.")
+    session = EnrollmentSession(_engine(cfg))
+    print(f"Enregistrement du visage de « {user} ». Suivez les consignes.")
+    last = ""
     with _camera(cfg) as cam:
-        emb = engine.enroll(cam.frames(cfg.enroll.timeout_s), on_feedback=lambda m: print(f"  … {m}"))
+        for frame in cam.frames(cfg.enroll.timeout_s):
+            ev = session.feed(frame)
+            msg = f"[{ev.progress:4.0%}] {ev.instruction}" + (f" — {ev.hint}" if ev.hint else "")
+            if msg != last:
+                print(f"  {msg}")
+                last = msg
+            if ev.done:
+                break
         camera_id = cam.info.identity
-    if len(emb) < cfg.enroll.samples:
-        print(f"Échec : {len(emb)}/{cfg.enroll.samples} captures valides. Rien n'a été enregistré.")
+    out = session.finish()
+    s = out.stats
+    if "relief" in s:
+        print(f"  relief mesuré {s['relief']:.3f} (minimum {cfg.enroll.min_parallax})")
+    if "liveness_median" in s:
+        print(f"  vivant : médiane {s['liveness_median']:+.2f}, 10e centile {s['liveness_p10']:+.2f}")
+    if not out.ok:
+        print(f"Échec : {out.reason}. Rien n'a été enregistré.")
         return 1
     existing = store.load(user)
-    if existing is not None and not args.replace:
-        if cfg.camera.pin_identity and existing.camera and existing.camera != camera_id:
-            print("Refusé : caméra différente de celle de l'enrôlement initial (utilisez --replace).")
-            return 1
-        import numpy as np
-        emb = np.concatenate([existing.embeddings, emb])[-64:]
-    store.save(Enrollment(user=user, embeddings=emb, camera=camera_id))
-    print(f"Visage enregistré ({len(emb)} empreintes chiffrées, aucune image conservée).")
+    if existing is not None and cfg.camera.pin_identity and existing.camera and existing.camera != camera_id \
+            and not args.replace:
+        print("Refusé : caméra différente de celle de l'enrôlement initial (utilisez --replace).")
+        return 1
+    store.save(Enrollment(user=user, embeddings=out.embeddings, camera=camera_id,
+                          liveness_threshold=out.liveness_threshold, stats=out.stats))
+    print(f"Visage enregistré : {len(out.embeddings)} empreintes chiffrées, aucune image conservée.")
+    print(f"Seuil de vivant personnel : {out.liveness_threshold:+.2f}"
+          f" (bornes {cfg.liveness.floor:+.1f} à {cfg.liveness.ceiling:+.1f})")
     return 0
 
 
@@ -119,13 +136,13 @@ def cmd_test(cfg: Config, args) -> int:
         if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
             print("Refusé : ce n'est pas la caméra utilisée à l'enrôlement.")
             return 1
-        res = engine.authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings)
+        res = engine.authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings, enr.liveness_threshold)
     lv = res.liveness_scores
     print(f"Résultat : {res.status.value}")
     print(f"  similarité max {res.best_similarity:.3f} (seuil {cfg.recognition.threshold})")
     if lv:
         win = f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "fenêtre incomplète"
-        print(f"  vivant : moyenne sur {cfg.auth.window_frames} images {win} (seuil {cfg.liveness.threshold:+.2f});"
+        print(f"  vivant : moyenne sur {cfg.auth.window_frames} images {win} (seuil {res.liveness_threshold:+.2f});"
               f" image par image de {min(lv):+.2f} à {max(lv):+.2f}")
     print(f"  {res.frames} images en {res.elapsed_s:.2f} s")
     return 0 if res.ok else 1
@@ -182,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("init", help="prépare le stockage chiffré")
     sub.add_parser("doctor", help="vérifie modèles, caméra et droits")
     e = sub.add_parser("enroll", help="enregistre votre visage")
-    e.add_argument("--replace", action="store_true", help="remplace l'enrôlement existant")
+    e.add_argument("--replace", action="store_true", help="accepte une caméra différente de l'enrôlement initial")
     sub.add_parser("test", help="teste la reconnaissance, sans rien déverrouiller")
     c = sub.add_parser("calibrate", help="mesure les scores réels (aucune image conservée)")
     c.add_argument("label", nargs="?", help="reel, autre, photo-ecran, photo-papier, video…")

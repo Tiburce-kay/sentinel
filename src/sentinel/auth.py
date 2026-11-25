@@ -50,6 +50,7 @@ class AuthResult:
     best_similarity: float = -1.0
     liveness_scores: list[float] = field(default_factory=list)
     window_liveness: float = -math.inf   # meilleure moyenne de vivant sur une fenêtre complète
+    liveness_threshold: float = math.nan  # seuil effectivement appliqué
     elapsed_s: float = 0.0
 
     @property
@@ -80,7 +81,8 @@ class Engine:
         live = fut.result() if fut is not None else float("nan")
         return sim, live
 
-    def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray) -> AuthResult:
+    def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray,
+                     liveness_threshold: float | None = None) -> AuthResult:
         """Accepte quand `window_frames` images CONSÉCUTIVES montrent chacune un visage
         de qualité, reconnu comme le bon, ET que la moyenne de leurs scores de vivant
         dépasse le seuil.
@@ -91,6 +93,9 @@ class Engine:
         nettement séparées (voir docs/CALIBRATION.md). L'identité, elle, est exigée
         sur chaque image : une image non reconnue remet la fenêtre à zéro."""
         rc, lc, k = self.cfg.recognition, self.cfg.liveness, self.cfg.auth.window_frames
+        # Seuil personnel (calibration à l'enrôlement), toujours ramené entre les bornes.
+        live_t = lc.threshold if liveness_threshold is None else float(np.clip(liveness_threshold, lc.floor, lc.ceiling))
+        result_threshold = live_t
         use_live = lc.enabled and self.liveness is not None
         start = time.monotonic()
         result = AuthResult(Status.NO_FACE)
@@ -120,7 +125,7 @@ class Engine:
                     continue
                 mean = float(np.mean(window)) if use_live else float("inf")
                 result.window_liveness = max(result.window_liveness, mean)
-                if mean >= lc.threshold:
+                if mean >= live_t:
                     result.status = Status.SUCCESS
                     break
                 full_window_spoof = True
@@ -129,7 +134,7 @@ class Engine:
                 pool.shutdown(wait=True)
         if result.status is not Status.SUCCESS:
             partial = result.liveness_scores
-            if full_window_spoof or (len(partial) >= 3 and float(np.mean(partial)) < lc.threshold):
+            if full_window_spoof or (len(partial) >= 3 and float(np.mean(partial)) < live_t):
                 # Pas de fenêtre complète, mais les images reconnues étaient nettement
                 # « non vivantes » : on le dit, plutôt que d'annoncer un simple délai.
                 result.status = Status.SPOOF
@@ -137,55 +142,6 @@ class Engine:
                 result.status = Status.TIMEOUT
             elif result.best_similarity > -1.0:
                 result.status = Status.NO_MATCH
+        result.liveness_threshold = result_threshold
         result.elapsed_s = time.monotonic() - start
         return result
-
-    # --- Enrôlement -----------------------------------------------------------
-
-    def enroll(self, frames: Iterable[np.ndarray], on_feedback: Callable[[str], None] = lambda m: None) -> np.ndarray:
-        """Collecte des empreintes de bonne qualité, d'un visage vivant et unique.
-
-        Les images trop proches d'une empreinte déjà retenue sont ignorées pour
-        obtenir des gabarits variés (légers changements d'angle et d'expression)."""
-        ec, lc = self.cfg.enroll, self.cfg.liveness
-        kept: list[np.ndarray] = []
-        lives: list[float] = []
-        last_msg = ""
-
-        def say(msg: str) -> None:
-            nonlocal last_msg
-            if msg != last_msg:
-                on_feedback(msg)
-                last_msg = msg
-
-        for frame in frames:
-            faces = self.detector.detect(frame)
-            if len(faces) != 1:
-                say("aucun visage détecté" if not faces else "plusieurs visages : une seule personne devant la caméra")
-                continue
-            face = faces[0]
-            q = self._quality(frame, face)
-            if not q.ok:
-                say(q.reason)
-                continue
-            emb = self.recognizer.embed(frame, face)
-            if kept:
-                ref = np.stack(kept)
-                # Cohérence : toutes les images doivent montrer la même personne.
-                if best_similarity(emb, ref) < self.cfg.recognition.threshold:
-                    say("visage différent des précédents : une seule personne")
-                    continue
-                if best_similarity(emb, ref) > 0.92:
-                    say("bougez légèrement la tête")
-                    continue
-            kept.append(emb)
-            if lc.enabled and self.liveness is not None:
-                lives.append(self.liveness.score(frame, face))
-            say(f"capture {len(kept)}/{ec.samples}")
-            if len(kept) >= ec.samples:
-                break
-        if lives and float(np.mean(lives)) < lc.threshold:
-            # Comme pour l'authentification, le vivant se juge sur l'ensemble.
-            say("visage jugé non vivant (photo, écran ?) : rien n'est enregistré")
-            return np.zeros((0, 128), np.float32)
-        return np.stack(kept) if kept else np.zeros((0, 128), np.float32)
