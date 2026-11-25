@@ -45,11 +45,12 @@ ok "$(tail -1 /tmp/pytest.log)"
 echo "=== 3. assistant graphique (démonstration, écran virtuel)"
 GSK_RENDERER=cairo GDK_BACKEND=x11 timeout 60 xvfb-run -a -s "-screen 0 1024x768x24" \
     sentinel-setup --demo --snapshot /tmp/snap > /tmp/gui.log 2>&1 || true
-pages=$(ls /tmp/snap 2>/dev/null | sed 's/^[0-9]*-//; s/\.png$//' | sort -u | tr '\n' ' ')
+pages=$(grep '^page: ' /tmp/gui.log | cut -d' ' -f2 | sort -u | tr '\n' ' ')
 for p in welcome capture verify confirm done; do
     echo "$pages" | grep -qw "$p" || { grep -v -E 'libEGL|^$' /tmp/gui.log | tail -15; fail "page $p de l'assistant"; }
 done
-ok "pages : $pages"
+grep -qE "Traceback|Segmentation|CRITICAL" /tmp/gui.log && { grep -v -E 'libEGL|^$' /tmp/gui.log | tail -15; fail "erreur dans l'assistant"; }
+ok "pages parcourues sans erreur : $pages"
 
 echo "=== 4. sudo réel avec le module PAM"
 useradd -m alice && echo 'alice:Bon-Mdp-42' | chpasswd && usermod -aG sudo alice

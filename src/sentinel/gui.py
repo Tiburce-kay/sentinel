@@ -27,6 +27,9 @@ gi.require_version("Graphene", "1.0")
 from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Graphene, Gsk, Gtk  # noqa: E402
 
 APP_ID = "io.github.tiburcekay.Sentinel"
+# Les captures d'écran passent par les nœuds de rendu GSK, que les anciennes versions
+# de PyGObject (Ubuntu 22.04, Debian 12) ne savent pas manipuler : elles y plantent.
+SNAPSHOTS_SUPPORTED = (Gtk.get_major_version(), Gtk.get_minor_version()) >= (4, 10)
 STEPS = ("face", "gauche", "droite", "haut", "bas")
 # L'aperçu est affiché en miroir, comme un selfie : la gauche de la personne est
 # donc à gauche de l'écran.
@@ -462,8 +465,10 @@ class Wizard(Adw.ApplicationWindow):
             self.view.remove_css_class("lit")
             self.unfullscreen()
         if self.snapshot_dir:
+            print(f"page: {name}", flush=True)  # trace vérifiée par les tests d'installation
             # Capture de la page en cours, au moment où elle est la plus parlante.
-            GLib.timeout_add(1800 if name == "capture" else 600, self._snapshot, name)
+            if SNAPSHOTS_SUPPORTED:
+                GLib.timeout_add(1800 if name == "capture" else 600, self._snapshot, name)
 
     def _fail(self, message: str) -> None:
         self.error_status.set_description(message)
