@@ -51,3 +51,37 @@ def test_camera_virtuelle_acceptee_si_desactive(tmp_path):
 def test_identite_stable(tmp_path):
     a, b = list_cameras(make_sysfs(tmp_path))[:2]
     assert a.identity == b.identity
+
+
+class _Cam:
+    def __init__(self, n, drops):
+        self.n, self.drops_frames = n, drops
+
+    def frames(self, timeout):
+        return iter(range(1, self.n + 1))
+
+
+def test_lecteur_continu_sans_perte_en_simulation():
+    from sentinel.camera import FrameGrabber
+
+    seen, seq = [], 0
+    with FrameGrabber(_Cam(50, drops=False), 5) as g:
+        while True:
+            seq, frame = g.wait_new(seq)
+            if frame is None and g.ended:
+                break
+            if frame is not None:
+                seen.append(frame)
+    assert seen == list(range(1, 51))
+
+
+def test_lecteur_continu_fin_de_flux():
+    from sentinel.camera import FrameGrabber
+
+    with FrameGrabber(_Cam(3, drops=True), 5) as g:
+        import time
+        time.sleep(0.1)
+        assert g.latest() == 3
+        seq, frame = g.wait_new(0)
+        assert frame == 3
+        assert g.wait_new(seq, timeout=0.2)[1] is None and g.ended

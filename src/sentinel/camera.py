@@ -11,6 +11,7 @@ vraie caméra passe ce contrôle. La détection du vivant reste alors la défens
 from __future__ import annotations
 
 import os
+import threading
 import re
 import time
 from collections.abc import Iterator
@@ -154,3 +155,75 @@ class Camera:
                 continue
             failures = 0
             yield frame
+
+
+class FrameGrabber:
+    """Lit la caméra en continu dans un fil d'exécution séparé.
+
+    L'aperçu (fluide) et l'analyse (plus lente) prennent chacun la dernière image
+    disponible, sans s'attendre l'un l'autre. Avec une caméra simulée (tests),
+    `drops_frames = False` fait attendre le lecteur : aucune image n'est sautée.
+    """
+
+    def __init__(self, cam, timeout_s: float):
+        self._frames = cam.frames(timeout_s)
+        self._drop = getattr(cam, "drops_frames", True)
+        self._cond = threading.Condition()
+        self._frame = None
+        self._seq = 0
+        self._taken = 0
+        self._ended = False
+        self._error: BaseException | None = None
+        self._stop = False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def __enter__(self) -> "FrameGrabber":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        with self._cond:
+            self._stop = True
+            self._cond.notify_all()
+        self._thread.join(timeout=2)
+
+    def _run(self) -> None:
+        try:
+            for frame in self._frames:
+                with self._cond:
+                    while not self._drop and self._taken < self._seq and not self._stop:
+                        self._cond.wait(0.5)
+                    if self._stop:
+                        return
+                    self._frame, self._seq = frame, self._seq + 1
+                    self._cond.notify_all()
+        except BaseException as exc:  # noqa: BLE001 — transmis au lecteur
+            self._error = exc
+        finally:
+            with self._cond:
+                self._ended = True
+                self._cond.notify_all()
+
+    def latest(self):
+        with self._cond:
+            return self._frame
+
+    def wait_new(self, last_seq: int, timeout: float = 1.0):
+        """Attend une image plus récente que `last_seq`. Renvoie (seq, image) ou (seq, None)
+        à la fin du flux."""
+        with self._cond:
+            while self._seq <= last_seq and not self._ended and not self._stop:
+                if not self._cond.wait(timeout):
+                    break
+            if self._error is not None:
+                raise self._error
+            if self._seq <= last_seq:
+                return last_seq, None
+            self._taken = self._seq
+            self._cond.notify_all()
+            return self._seq, self._frame
+
+    @property
+    def ended(self) -> bool:
+        with self._cond:
+            return self._ended and self._taken >= self._seq

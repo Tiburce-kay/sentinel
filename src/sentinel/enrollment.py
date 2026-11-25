@@ -25,6 +25,8 @@ from .geometry import Pose, landmarks, parallax
 from .vision import Face, best_similarity
 
 STEPS = ("face", "gauche", "droite", "haut", "bas")
+REFERENCE_FRAMES = 5  # images de face pour fixer la position de référence
+BACK_TO_FACE = "Revenez de face"
 INSTRUCTIONS = {
     "face": "Regardez la caméra",
     "gauche": "Tournez lentement la tête vers votre gauche",
@@ -65,7 +67,12 @@ class EnrollmentSession:
         self.parallaxes: dict[str, list[float]] = {s: [] for s in STEPS[1:]}
         self.lives: list[float] = []   # séquence des scores de vivant (images valides)
         self.breaks: list[int] = []    # positions où la séquence a été interrompue
-        self._frames_in_step = 0
+        self._reference_samples: list[np.ndarray] = []
+        self.anchor: np.ndarray | None = None
+        # Une pose ne compte qu'après un retour de face : chaque mouvement est voulu,
+        # et une pose ne peut pas être validée par hasard en passant.
+        self.armed = True
+        self.pose_log: dict[str, list[float]] = {}
 
     @property
     def step(self) -> str:
@@ -81,7 +88,12 @@ class EnrollmentSession:
         return got / (n * len(STEPS))
 
     def _event(self, hint: str = "", box=None) -> EnrollEvent:
-        return EnrollEvent(self.step, INSTRUCTIONS[self.step], self._progress(), hint, box, self.done)
+        instruction = INSTRUCTIONS[self.step] if self.armed or self.done else BACK_TO_FACE
+        return EnrollEvent(self.step, instruction, self._progress(), hint, box, self.done)
+
+    def _near_face(self, pose: Pose) -> bool:
+        ref, ec = self.reference_pose, self.ec
+        return abs(pose.yaw - ref.yaw) < ec.yaw_delta / 2 and abs(pose.pitch - ref.pitch) < ec.pitch_delta / 2
 
     def _pose_reached(self, pose: Pose) -> bool:
         ref, ec = self.reference_pose, self.ec
@@ -109,8 +121,12 @@ class EnrollmentSession:
             self._break()
             return self._event(q.reason.capitalize(), face.box)
         emb = self.e.recognizer.embed(frame, face)
-        everyone = [e for v in self.per_step.values() for e in v]
-        if everyone and best_similarity(emb, np.stack(everyone)) < self.e.cfg.recognition.threshold:
+        # Même personne du début à la fin : comparaison à la première empreinte vue
+        # (dès les images de référence) et à toutes celles retenues.
+        if self.anchor is None:
+            self.anchor = emb
+        everyone = [self.anchor] + [e for v in self.per_step.values() for e in v]
+        if best_similarity(emb, np.stack(everyone)) < self.e.cfg.recognition.threshold:
             self._break()
             return self._event("Visage différent : une seule personne pendant l'enregistrement", face.box)
         if self.e.liveness is not None and self.lc.enabled:
@@ -118,7 +134,16 @@ class EnrollmentSession:
         pts = landmarks(face.raw)
         pose = Pose.of(pts)
         if self.reference_pts is None:
-            self.reference_pts, self.reference_pose = pts, pose
+            # Référence : position médiane sur plusieurs images de face.
+            self._reference_samples.append(pts)
+            if len(self._reference_samples) < REFERENCE_FRAMES:
+                return self._event("", face.box)
+            self.reference_pts = np.median(np.stack(self._reference_samples), axis=0)
+            self.reference_pose = Pose.of(self.reference_pts)
+        if not self.armed:
+            if self._near_face(pose):
+                self.armed = True
+            return self._event("", face.box)
         if not self._pose_reached(pose):
             return self._event("", face.box)
         if self.step != "face":
@@ -127,7 +152,11 @@ class EnrollmentSession:
         if not kept or best_similarity(emb, np.stack(kept)) < 0.97:
             kept.append(emb)
         if len(kept) >= self.ec.per_pose:
+            if self.step != "face":
+                ref = self.reference_pose
+                self.pose_log[self.step] = [round(pose.yaw - ref.yaw, 3), round(pose.pitch - ref.pitch, 3)]
             self.step_i += 1
+            self.armed = self.step_i <= 1  # après « face », il faut revenir de face entre deux poses
         return self._event("", face.box)
 
     def _break(self) -> None:
@@ -152,7 +181,7 @@ class EnrollmentSession:
             return EnrollOutcome(False, f"Enregistrement incomplet (étape « {self.step} »)", empty, lc.threshold)
         side = [p for s in STEPS[1:] for p in self.parallaxes[s]]
         relief = float(np.median(side)) if side else 0.0
-        stats = {"relief": relief, "frames": len(self.lives)}
+        stats = {"relief": relief, "frames": len(self.lives), "poses": self.pose_log}
         if relief < self.ec.min_parallax:
             return EnrollOutcome(False, "Relief du visage insuffisant : photo ou écran suspecté",
                                  empty, lc.threshold, stats)

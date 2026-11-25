@@ -16,6 +16,8 @@ PASSWORD = "bon-mot-de-passe"
 
 
 class FakeCamera:
+    drops_frames = False  # caméra simulée : aucune image sautée
+
     def __init__(self, scenes):
         self.scenes = scenes
         self.info = type("Info", (), {"identity": "04f2:b5ab||cam"})()
@@ -31,7 +33,8 @@ class FakeCamera:
 
 
 def enrollment_scenes():
-    return [Shot(ME, 1.0, **POSES[s]) for s in STEPS for _ in range(12)]
+    from tests.test_enrollment import user_frames
+    return list(user_frames())
 
 
 @pytest.fixture
@@ -62,7 +65,7 @@ def enroll(state, password=PASSWORD, uses=None):
     with state.client() as c:
         msgs = list(c.stream("enroll_start", preview=False))
         assert msgs[-1]["event"] == "finished" and msgs[-1]["ok"], msgs[-1]
-        assert any(m.get("step") == "gauche" for m in msgs)
+        assert set(msgs[-1]["stats"]["poses"]) == {"gauche", "droite", "haut", "bas"}
         r = c.call("enroll_commit", password=password, uses=uses or {})
         return msgs, r
 
@@ -78,7 +81,6 @@ def test_parcours_complet(service):
         assert c.call("authenticate", service="sudo")["status"] == "not_enrolled"
     msgs, r = enroll(service)
     assert r["ok"]
-    assert msgs[0]["event"] == "progress" and "instruction" in msgs[0]
     service.scenes = [Shot(ME, 1.0)] * 20
     with service.client() as c:
         st = c.call("status")

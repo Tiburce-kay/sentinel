@@ -32,10 +32,14 @@ STEPS = ("face", "gauche", "droite", "haut", "bas")
 # donc à gauche de l'écran.
 ARROWS = {"face": "", "gauche": "←", "droite": "→", "haut": "↑", "bas": "↓"}
 
-CSS = b"""
+CSS = """
 .arrow { font-size: 40px; font-weight: 800; color: @accent_color; min-height: 52px; }
 .instruction { font-size: 20px; font-weight: 700; }
 .hint { color: @warning_color; min-height: 22px; }
+/* Pendant la capture, l'écran devient une source de lumière blanche pour le visage. */
+.lit, .lit headerbar { background-color: #ffffff; color: #1d1d1f; }
+.lit .hint { color: #b35c00; }
+.lit .dim-label { color: alpha(#1d1d1f, 0.6); }
 .promise { font-size: 15px; }
 """
 
@@ -207,10 +211,10 @@ class Wizard(Adw.ApplicationWindow):
         self.cancelled = False
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT, vexpand=True)
-        view = Adw.ToolbarView()
-        view.add_top_bar(Adw.HeaderBar())
-        view.set_content(self.stack)
-        self.set_content(view)
+        self.view = Adw.ToolbarView()
+        self.view.add_top_bar(Adw.HeaderBar())
+        self.view.set_content(self.stack)
+        self.set_content(self.view)
         for name, builder in (("welcome", self._welcome), ("capture", self._capture),
                               ("verify", self._verify), ("confirm", self._confirm),
                               ("done", self._done), ("error", self._error)):
@@ -224,18 +228,18 @@ class Wizard(Adw.ApplicationWindow):
                           margin_start=18, margin_end=18)
         return Gtk.ScrolledWindow(child=clamp, hscrollbar_policy=Gtk.PolicyType.NEVER)
 
+    def _status_page(self, icon: str, title: str, description: str, child: Gtk.Widget) -> Adw.StatusPage:
+        """Page standard libadwaita : défile et se centre d'elle-même, sans rien couper."""
+        clamp = Adw.Clamp(maximum_size=420, child=child)
+        return Adw.StatusPage(icon_name=icon, title=title, description=description, child=clamp)
+
     def _welcome(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        status = Adw.StatusPage(icon_name="camera-web-symbolic",
-                                title="Déverrouillez votre PC avec votre visage",
-                                description="Sentinel reconnaît votre visage et vérifie qu'il s'agit "
-                                            "bien de vous, en vrai, et non d'une photo ou d'une vidéo.")
-        box.append(status)
         for text in ("Tout reste sur cet ordinateur, sans Internet",
                      "Aucune photo de vous n'est enregistrée",
                      "Votre mot de passe reste toujours utilisable"):
             box.append(check_row(text))
-        self.welcome_state = Gtk.Label(wrap=True, margin_top=10)
+        self.welcome_state = Gtk.Label(wrap=True, margin_top=10, justify=Gtk.Justification.CENTER)
         self.welcome_state.add_css_class("dim-label")
         box.append(self.welcome_state)
         self.start_button = Gtk.Button(label="Commencer", halign=Gtk.Align.CENTER, margin_top=6,
@@ -249,7 +253,11 @@ class Wizard(Adw.ApplicationWindow):
         self.remove_button.add_css_class("flat")
         self.remove_button.connect("clicked", lambda *_: self._ask_remove())
         box.append(self.remove_button)
-        return self._page(box)
+        page = self._status_page("camera-web-symbolic", "Déverrouillez votre PC avec votre visage",
+                                 "Sentinel reconnaît votre visage et vérifie qu'il s'agit bien de vous, "
+                                 "en vrai, et non d'une photo ou d'une vidéo.", box)
+        page.add_css_class("compact")
+        return page
 
     def _capture(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, valign=Gtk.Align.CENTER)
@@ -274,9 +282,6 @@ class Wizard(Adw.ApplicationWindow):
 
     def _verify(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.verify_status = Adw.StatusPage(icon_name="face-smile-symbolic", title="Vérification",
-                                            description="Regardez la caméra…")
-        box.append(self.verify_status)
         self.verify_spinner = Adw.Spinner(halign=Gtk.Align.CENTER, width_request=32, height_request=32)
         box.append(self.verify_spinner)
         buttons = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
@@ -290,7 +295,9 @@ class Wizard(Adw.ApplicationWindow):
         buttons.append(self.verify_retry)
         buttons.append(self.verify_next)
         box.append(buttons)
-        return self._page(box)
+        self.verify_status = self._status_page("face-smile-symbolic", "Vérification",
+                                               "Regardez la caméra…", box)
+        return self.verify_status
 
     def _confirm(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
@@ -323,32 +330,34 @@ class Wizard(Adw.ApplicationWindow):
         return self._page(box)
 
     def _done(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.done_status = Adw.StatusPage(icon_name="object-select-symbolic", title="Visage enregistré",
-                                          description="Seules des empreintes chiffrées sont conservées, "
-                                                      "jamais d'image. Vous pouvez relancer cet assistant "
-                                                      "pour modifier vos choix.")
-        box.append(self.done_status)
         close = Gtk.Button(label="Fermer", halign=Gtk.Align.CENTER)
         close.add_css_class("pill")
         close.connect("clicked", lambda *_: self.close())
-        box.append(close)
-        return self._page(box)
+        self.done_status = self._status_page(
+            "object-select-symbolic", "Visage enregistré",
+            "Seules des empreintes chiffrées sont conservées, jamais d'image. "
+            "Vous pouvez relancer cet assistant pour modifier vos choix.", close)
+        return self.done_status
 
     def _error(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.error_status = Adw.StatusPage(icon_name="dialog-warning-symbolic", title="Un problème est survenu")
-        box.append(self.error_status)
         retry = Gtk.Button(label="Recommencer", halign=Gtk.Align.CENTER)
         retry.add_css_class("pill")
         retry.connect("clicked", lambda *_: self._connect())
-        box.append(retry)
-        return self._page(box)
+        self.error_status = self._status_page("dialog-warning-symbolic", "Un problème est survenu", "", retry)
+        return self.error_status
 
     # -- Déroulement ------------------------------------------------------------
 
     def _show(self, name: str) -> None:
         self.stack.set_visible_child_name(name)
+        # Capture et vérification : plein écran blanc, pour éclairer le visage.
+        lit = name in ("capture", "verify")
+        if lit:
+            self.view.add_css_class("lit")
+            self.fullscreen()
+        else:
+            self.view.remove_css_class("lit")
+            self.unfullscreen()
         if self.snapshot_dir:
             # Capture de la page en cours, au moment où elle est la plus parlante.
             GLib.timeout_add(1800 if name == "capture" else 600, self._snapshot, name)
@@ -448,7 +457,7 @@ class Wizard(Adw.ApplicationWindow):
             elif result.get("ok"):
                 self.verify_status.set_icon_name("object-select-symbolic")
                 self.verify_status.set_title("Reconnu")
-                self.verify_status.set_description(f"Votre visage a été reconnu en {result.get('elapsed', 0):.1f} s.")
+                self.verify_status.set_description(f"Votre visage a été reconnu en {result.get('elapsed', 0):.1f} s.".replace(".", ",", 1))
                 self.verify_next.set_visible(True)
                 if self.snapshot_dir:
                     self._show("verify")
@@ -529,7 +538,7 @@ class App(Adw.Application):
 
     def do_activate(self) -> None:
         provider = Gtk.CssProvider()
-        provider.load_from_string(CSS.decode())
+        provider.load_from_string(CSS)
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         win = Wizard(self, self.backend_factory, self.snapshot_dir)

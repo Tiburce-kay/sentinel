@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 
 from .auth import Engine, Status
-from .camera import Camera, CameraError, select_camera
+from .camera import Camera, CameraError, FrameGrabber, select_camera
 from .config import Config, load_config
 from .enrollment import EnrollmentSession
 from .peer import Peer, in_active_local_session, peer_of, user_has_session
@@ -249,19 +249,9 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("busy", "caméra déjà utilisée par Sentinel")
         try:
             session = EnrollmentSession(st.get_engine())
-            with st.open_camera() as cam:
+            with st.open_camera() as cam, FrameGrabber(cam, cfg.enroll.timeout_s) as grab:
                 camera_id = cam.info.identity
-                for frame in cam.frames(cfg.enroll.timeout_s):
-                    ev = session.feed(frame)
-                    msg = {"event": "progress", "step": ev.step, "instruction": ev.instruction,
-                           "progress": round(ev.progress, 3), "hint": ev.hint,
-                           "box": list(ev.box) if ev.box else None,
-                           "size": [frame.shape[1], frame.shape[0]]}
-                    if req.get("preview", True):
-                        msg["preview"] = _preview(frame)
-                    self.send(msg)
-                    if ev.done:
-                        break
+                self._enroll_loop(session, grab, bool(req.get("preview", True)))
         finally:
             st.camera_lock.release()
         out = session.finish()
@@ -271,6 +261,50 @@ class Handler(socketserver.StreamRequestHandler):
                  {k: round(v, 3) if isinstance(v, float) else v for k, v in out.stats.items()})
         self.send({"event": "finished", "ok": out.ok, "message": out.reason,
                    "stats": {k: round(v, 3) if isinstance(v, float) else v for k, v in out.stats.items()}})
+
+    PREVIEW_FPS = 15
+
+    def _enroll_loop(self, session: EnrollmentSession, grab: FrameGrabber, preview: bool) -> None:
+        """Analyse dans un fil séparé ; ce fil-ci envoie l'aperçu à cadence régulière,
+        avec la dernière consigne connue."""
+        shared: dict = {"ev": None, "error": None, "stop": False}
+
+        def analyze():
+            seq = 0
+            try:
+                while not shared["stop"]:
+                    seq, frame = grab.wait_new(seq)
+                    if frame is None:
+                        if grab.ended:
+                            return
+                        continue
+                    ev = session.feed(frame)
+                    shared["ev"] = ev
+                    if ev.done:
+                        return
+            except BaseException as exc:  # noqa: BLE001 — renvoyée au fil principal
+                shared["error"] = exc
+
+        worker = threading.Thread(target=analyze, daemon=True)
+        worker.start()
+        try:
+            while worker.is_alive():
+                tick = time.monotonic()
+                frame, ev = grab.latest(), shared["ev"]
+                if frame is not None and ev is not None:
+                    msg = {"event": "progress", "step": ev.step, "instruction": ev.instruction,
+                           "progress": round(ev.progress, 3), "hint": ev.hint,
+                           "box": list(ev.box) if ev.box else None,
+                           "size": [frame.shape[1], frame.shape[0]]}
+                    if preview:
+                        msg["preview"] = _preview(frame)
+                    self.send(msg)
+                worker.join(max(0.0, 1 / self.PREVIEW_FPS - (time.monotonic() - tick)))
+        finally:
+            shared["stop"] = True
+            worker.join(timeout=5)
+        if shared["error"] is not None:
+            raise shared["error"]
 
     def op_enroll_verify(self, req: dict) -> None:
         """Vérifie, AVANT de l'enregistrer, que le nouveau gabarit reconnaît bien la personne."""

@@ -42,7 +42,7 @@ export SENTINEL_CONFIG=config.dev.toml        # stockage local, sans root
 .venv/bin/sentinel test                       # teste, sans rien déverrouiller
 .venv/bin/sentinel calibrate reel             # mesure les scores (voir docs/CALIBRATION.md)
 
-.venv/bin/python -m pytest                    # 81 tests
+.venv/bin/python -m pytest                    # 85 tests
 
 # Service + assistant graphique (deux terminaux)
 .venv/bin/sentineld                           # terminal 1

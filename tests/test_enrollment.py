@@ -52,11 +52,17 @@ def session(**over):
                                     quality=lambda fr, f: Quality(True)))
 
 
-def run(sess, shots_per_pose=12, who=ME, live=1.0, model=HEAD):
-    events = []
+def user_frames(shots_per_pose=12, who=ME, live=1.0, model=HEAD, scale=1.0):
+    """Comme un vrai utilisateur : chaque pose, puis retour de face."""
     for step in STEPS:
         for _ in range(shots_per_pose):
-            events.append(sess.feed(Shot(who, live, model, **POSES[step])))
+            yield Shot(who, live, model, **{k: scale * v for k, v in POSES[step].items()})
+        for _ in range(3):
+            yield Shot(who, live, model)
+
+
+def run(sess, shots_per_pose=12, who=ME, live=1.0, model=HEAD):
+    events = [sess.feed(f) for f in user_frames(shots_per_pose, who, live, model)]
     return events, sess.finish()
 
 
@@ -66,6 +72,7 @@ def test_enrolement_complet_d_un_vrai_visage():
     assert out.embeddings.shape == (10, 128)
     assert events[-1].done and events[-1].progress == 1.0
     assert out.stats["relief"] > 0.10
+    assert set(out.stats["poses"]) == {"gauche", "droite", "haut", "bas"}
     assert -2.0 <= out.liveness_threshold <= 1.0
 
 
@@ -73,16 +80,50 @@ def test_progression_et_consignes():
     sess = session()
     ev = sess.feed(Shot(ME, 1.0))
     assert ev.step == "face" and ev.instruction == "Regardez la caméra"
-    ev = sess.feed(Shot(ME, 1.0))
+    for _ in range(5):
+        ev = sess.feed(Shot(ME, 1.0))
     assert ev.step == "gauche" and 0 < ev.progress < 1
+    assert ev.instruction.startswith("Tournez")
+
+
+def test_retour_de_face_exige_entre_deux_poses():
+    """Passer directement de gauche à droite ne valide pas « droite » : il faut revenir de face."""
+    sess = session()
+    for _ in range(6):
+        sess.feed(Shot(ME, 1.0))
+    for _ in range(4):
+        ev = sess.feed(Shot(ME, 1.0, **POSES["gauche"]))
+    assert ev.step == "droite" and ev.instruction == "Revenez de face"
+    for _ in range(6):
+        ev = sess.feed(Shot(ME, 1.0, **POSES["droite"]))
+    assert ev.step == "droite" and ev.instruction == "Revenez de face"
+    ev = sess.feed(Shot(ME, 1.0))
+    assert ev.instruction.startswith("Tournez lentement la tête vers votre droite")
+    for _ in range(3):
+        ev = sess.feed(Shot(ME, 1.0, **POSES["droite"]))
+    assert ev.step == "haut"
+
+
+def test_reference_mediane_resiste_a_une_premiere_image_penchee():
+    """Cas réel : tête légèrement baissée au début ; « haut » ne doit pas être validé d'office."""
+    sess = session()
+    sess.feed(Shot(ME, 1.0, pitch_deg=-8))
+    for _ in range(5):
+        sess.feed(Shot(ME, 1.0))
+    for step in ("gauche", "droite"):
+        for _ in range(4):
+            sess.feed(Shot(ME, 1.0, **POSES[step]))
+        sess.feed(Shot(ME, 1.0))
+    for _ in range(5):
+        ev = sess.feed(Shot(ME, 1.0))  # de face : ne vaut pas « haut »
+    assert ev.step == "haut"
 
 
 def test_photo_inclinee_refusee():
     """Une photo plate n'atteint pas les poses, ou n'a pas de relief : jamais enrôlée."""
     sess = session()
-    for step in STEPS:
-        for _ in range(12):
-            sess.feed(Shot(ME, 1.0, FLAT, **{k: 1.6 * v for k, v in POSES[step].items()}))
+    for f in user_frames(model=FLAT, scale=1.6):
+        sess.feed(f)
     assert not sess.finish().ok
 
 
