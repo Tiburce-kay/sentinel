@@ -123,7 +123,9 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 1 | Conception, modèle de menaces | ✔ |
 | 2 | Moteur : caméra, détection, empreinte, vivant (texture), stockage chiffré, CLI, calibration | ✔ (calibré sur le T570) |
 | 2b | Défi aléatoire actif ; reflet d'une séquence de couleurs de l'écran | à faire |
-| 3 | Service `sentineld` isolé + module `pam_sentinel.so` ; `sudo` | à faire |
+| 3a | Service `sentineld` : socket Unix, identité par SO_PEERCRED + logind, mot de passe via PAM, verrouillage, « mot de passe au démarrage » | ✔ |
+| 3b | Assistant graphique d'enrôlement (GTK4) | en cours |
+| 3c | Module `pam_sentinel.so`, paquet, service systemd isolé ; `sudo` | à faire |
 | 4 | Écran de verrouillage, GDM, verrouillage automatique en cas d'absence | à faire |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
 | 6 | Clé scellée dans le TPM, mise à jour adaptative des gabarits | à faire |

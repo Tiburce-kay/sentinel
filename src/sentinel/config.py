@@ -73,6 +73,11 @@ class QualityConfig:
 @dataclass
 class AuthConfig:
     timeout_s: float = 4.0
+    # Comme Face ID : mot de passe exigé au premier déverrouillage après le démarrage
+    # du service (donc du PC), puis à nouveau si le dernier date de plus de N heures.
+    # Le mot de passe déverrouille aussi le trousseau GNOME.
+    require_password_after_boot: bool = True
+    password_every_h: float = 48.0
     # Nombre d'images consécutives exigées : visage de qualité et reconnu sur
     # CHACUNE, et moyenne du score de vivant au-dessus du seuil.
     window_frames: int = 10
@@ -95,6 +100,7 @@ class EnrollConfig:
 class Config:
     data_dir: Path = Path("/var/lib/sentinel")
     models_dir: Path = Path("/usr/share/sentinel/models")
+    socket_path: Path = Path("/run/sentinel/sentinel.sock")
     # Vérifie que les fichiers sensibles appartiennent à root et sont protégés.
     strict_permissions: bool = True
     camera: CameraConfig = field(default_factory=CameraConfig)

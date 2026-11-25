@@ -13,6 +13,8 @@ POSES = {"face": {}, "gauche": {"yaw_deg": 25}, "droite": {"yaw_deg": -25},
 
 
 class Shot:
+    shape = (480, 640, 3)  # dimensions d'une image de webcam simulée
+
     def __init__(self, who, live, model=HEAD, n=1, **pose):
         self.who, self.live, self.model, self.n, self.pose = who, live, model, n, pose
 

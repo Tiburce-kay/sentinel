@@ -32,6 +32,7 @@ FORMAT = "sentinel-template"
 VERSION = 1
 USERNAME_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}\$?")
 MAX_TEMPLATES = 64
+DEFAULT_USES = {"sudo": True, "lockscreen": True, "login": False}
 
 
 class StoreError(Exception):
@@ -54,6 +55,10 @@ class Enrollment:
     embeddings: np.ndarray                 # (n, 128) float32, normalisées
     camera: str = ""                       # identité de la caméra d'enrôlement
     liveness_threshold: float | None = None  # seuil personnel issu de la calibration
+    # Usages autorisés par l'utilisateur (chiffrés avec le gabarit : non modifiables
+    # sans la clé). « login » reste inopérant tant que le mot de passe est exigé au
+    # démarrage.
+    uses: dict = field(default_factory=lambda: dict(DEFAULT_USES))
     stats: dict = field(default_factory=dict)
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
@@ -159,6 +164,7 @@ class TemplateStore:
             "count": int(emb.shape[0]),
             "camera": enr.camera,
             "liveness_threshold": enr.liveness_threshold,
+            "uses": {k: bool(enr.uses.get(k, False)) for k in DEFAULT_USES},
             "stats": enr.stats,
             "created": enr.created,
             "updated": time.time(),
@@ -193,6 +199,7 @@ class TemplateStore:
         emb = np.frombuffer(_unb64(data["embeddings"]), dtype=np.float32).reshape(data["count"], 128)
         return Enrollment(user=user, embeddings=emb.copy(), camera=data["camera"],
                           liveness_threshold=data.get("liveness_threshold"),
+                          uses=data.get("uses", dict(DEFAULT_USES)),
                           stats=data.get("stats", {}),
                           created=data["created"], updated=data["updated"])
 

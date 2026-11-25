@@ -20,6 +20,7 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 sentinel = "sentinel.cli:main"
+sentineld = "sentinel.daemon:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

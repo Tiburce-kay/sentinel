@@ -3,3 +3,8 @@
 data_dir = "dev-data/store"
 models_dir = "models"
 strict_permissions = false
+socket_path = "dev-data/sentinel.sock"
+
+[auth]
+# En développement, pas de mot de passe exigé après le démarrage du service.
+require_password_after_boot = false
