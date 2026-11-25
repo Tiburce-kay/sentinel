@@ -151,3 +151,14 @@ def test_enrolement_refuse_un_changement_de_personne():
     out = engine().enroll(seq, msgs.append)
     assert len(out) == 1
     assert any("visage différent" in m for m in msgs)
+
+
+def test_photo_sans_fenetre_complete_signalee_comme_usurpation():
+    """Cas réel : photo tenue de loin, fenêtre jamais complète, scores très bas."""
+    seq = ([Scene(ME, live=-7.0)] * 4 + [Scene(None)]) * 10
+    assert engine().authenticate(seq, T).status is Status.SPOOF
+
+
+def test_vrai_visage_interrompu_reste_un_delai():
+    seq = ([Scene(ME, live=1.0)] * 4 + [Scene(None)]) * 10
+    assert engine().authenticate(seq, T).status is Status.TIMEOUT

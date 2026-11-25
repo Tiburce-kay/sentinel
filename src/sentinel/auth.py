@@ -128,7 +128,10 @@ class Engine:
             if pool is not None:
                 pool.shutdown(wait=True)
         if result.status is not Status.SUCCESS:
-            if full_window_spoof:
+            partial = result.liveness_scores
+            if full_window_spoof or (len(partial) >= 3 and float(np.mean(partial)) < lc.threshold):
+                # Pas de fenêtre complète, mais les images reconnues étaient nettement
+                # « non vivantes » : on le dit, plutôt que d'annoncer un simple délai.
                 result.status = Status.SPOOF
             elif seen_match:
                 result.status = Status.TIMEOUT
