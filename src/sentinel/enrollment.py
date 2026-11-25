@@ -193,7 +193,9 @@ class EnrollmentSession:
             return EnrollOutcome(False, f"Enregistrement incomplet (étape « {self.step} »)", empty, lc.threshold)
         side = [p for s in STEPS[1:] for p in self.parallaxes[s]]
         relief = float(np.median(side)) if side else 0.0
-        stats = {"relief": relief, "frames": len(self.lives), "poses": self.pose_log}
+        ref = self.reference_pose
+        stats = {"relief": relief, "frames": len(self.lives), "poses": self.pose_log,
+                 "reference_pose": [round(ref.yaw, 4), round(ref.pitch, 4)] if ref else None}
         if relief < self.ec.min_parallax:
             return EnrollOutcome(False, "Relief du visage insuffisant : photo ou écran suspecté",
                                  empty, lc.threshold, stats)

@@ -136,7 +136,8 @@ def cmd_test(cfg: Config, args) -> int:
         if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
             print("Refusé : ce n'est pas la caméra utilisée à l'enrôlement.")
             return 1
-        res = engine.authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings, enr.liveness_threshold)
+        res = engine.authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings, enr.liveness_threshold,
+                                  enr.stats.get("reference_pose"))
     lv = res.liveness_scores
     print(f"Résultat : {res.status.value}")
     print(f"  similarité max {res.best_similarity:.3f} (seuil {cfg.recognition.threshold})")
@@ -144,7 +145,11 @@ def cmd_test(cfg: Config, args) -> int:
         win = f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "fenêtre incomplète"
         print(f"  vivant : moyenne sur {cfg.auth.window_frames} images {win} (seuil {res.liveness_threshold:+.2f});"
               f" image par image de {min(lv):+.2f} à {max(lv):+.2f}")
-    print(f"  {res.frames} images en {res.elapsed_s:.2f} s")
+    print(f"  {res.frames} images en {res.elapsed_s:.2f} s"
+          f" (caméra {res.camera_s:.2f} s, calcul {res.compute_s:.2f} s"
+          f", soit {1000 * res.compute_s / max(res.frames, 1):.0f} ms par image)")
+    if res.skipped_pose:
+        print(f"  {res.skipped_pose} images ignorées : tête trop tournée")
     return 0 if res.ok else 1
 
 

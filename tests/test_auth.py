@@ -12,10 +12,9 @@ OTHER = unit(2)
 
 
 def face():
-    raw = np.zeros(15, np.float32)
-    raw[:4] = [100, 100, 150, 150]
-    raw[14] = 0.99
-    return Face(raw)
+    """Visage de face, avec des points de repère réalistes (tête synthétique)."""
+    from tests.head import HEAD, project, raw_face
+    return Face(raw_face(project(HEAD)))
 
 
 class Scene:

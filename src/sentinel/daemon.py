@@ -226,7 +226,7 @@ class Handler(socketserver.StreamRequestHandler):
                 if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
                     raise Refused("camera", "caméra différente de celle de l'enrôlement")
                 res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings,
-                                                   enr.liveness_threshold)
+                                                   enr.liveness_threshold, enr.stats.get("reference_pose"))
         finally:
             st.camera_lock.release()
         if res.ok:
@@ -317,7 +317,7 @@ class Handler(socketserver.StreamRequestHandler):
         try:
             with st.open_camera() as cam:
                 res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), out.embeddings,
-                                                   out.liveness_threshold)
+                                                   out.liveness_threshold, out.stats.get("reference_pose"))
         finally:
             st.camera_lock.release()
         self.send({"ok": res.ok, "status": res.status.name.lower(), "message": res.status.value,

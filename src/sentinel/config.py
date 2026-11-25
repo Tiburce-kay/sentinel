@@ -86,6 +86,10 @@ class AuthConfig:
     # Nombre d'images consécutives exigées : visage de qualité et reconnu sur
     # CHACUNE, et moyenne du score de vivant au-dessus du seuil.
     window_frames: int = 10
+    # Au-delà de ces écarts à la position de face (voir geometry.Pose), l'image est
+    # ignorée : le modèle de vivant n'est pas fiable de profil (essai réel du 25/11).
+    max_yaw: float = 0.12
+    max_pitch: float = 0.08
     # Après ce nombre d'échecs consécutifs, le visage est refusé jusqu'à la
     # prochaine authentification par mot de passe.
     max_failures: int = 5

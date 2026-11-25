@@ -18,6 +18,7 @@ from typing import Protocol
 import numpy as np
 
 from .config import Config
+from .geometry import Pose, landmarks
 from .vision import Face, Quality, assess, best_similarity, largest
 
 
@@ -38,6 +39,7 @@ class Status(enum.Enum):
     NO_MATCH = "visage non reconnu"
     NO_FACE = "aucun visage détecté"
     TIMEOUT = "délai écoulé avant confirmation (restez face à la caméra)"
+    TURNED = "tête trop tournée : regardez l'écran, de face"
     SPOOF = "usurpation suspectée (photo, écran ou vidéo)"
     LOCKED = "trop d'échecs : mot de passe requis"
     NOT_ENROLLED = "aucun visage enregistré"
@@ -51,6 +53,9 @@ class AuthResult:
     liveness_scores: list[float] = field(default_factory=list)
     window_liveness: float = -math.inf   # meilleure moyenne de vivant sur une fenêtre complète
     liveness_threshold: float = math.nan  # seuil effectivement appliqué
+    skipped_pose: int = 0                 # images ignorées : tête trop tournée
+    camera_s: float = 0.0                 # temps passé à attendre la caméra
+    compute_s: float = 0.0                # temps passé à analyser
     elapsed_s: float = 0.0
 
     @property
@@ -73,6 +78,18 @@ class Engine:
 
     # --- Authentification -----------------------------------------------------
 
+    def _turned(self, face: Face, ref: Pose | None) -> bool:
+        """Tête nettement tournée par rapport à la position de face de l'utilisateur."""
+        p = Pose.of(landmarks(face.raw))
+        a = self.cfg.auth
+        if ref is not None:
+            return abs(p.yaw - ref.yaw) > a.max_yaw or abs(p.pitch - ref.pitch) > a.max_pitch
+        # Ancien enregistrement, sans position de référence : position de face
+        # moyenne (tangage ~0,55), avec une tolérance doublée sur le tangage.
+        return abs(p.yaw) > a.max_yaw or abs(p.pitch - self.NEUTRAL_PITCH) > 2 * a.max_pitch
+
+    NEUTRAL_PITCH = 0.55
+
     def _analyze(self, frame: np.ndarray, face: Face, templates: np.ndarray, pool) -> tuple[float, float]:
         """Similarité et score de vivant. Les deux modèles tournent en parallèle :
         OpenCV et ONNX Runtime libèrent le verrou de Python pendant le calcul."""
@@ -82,7 +99,8 @@ class Engine:
         return sim, live
 
     def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray,
-                     liveness_threshold: float | None = None) -> AuthResult:
+                     liveness_threshold: float | None = None,
+                     reference_pose: tuple[float, float] | None = None) -> AuthResult:
         """Accepte quand `window_frames` images CONSÉCUTIVES montrent chacune un visage
         de qualité, reconnu comme le bon, ET que la moyenne de leurs scores de vivant
         dépasse le seuil.
@@ -91,7 +109,12 @@ class Engine:
         visage varie beaucoup d'une image à l'autre, et une photo produit parfois une
         image isolée « vivante ». En moyenne sur la fenêtre, les deux populations sont
         nettement séparées (voir docs/CALIBRATION.md). L'identité, elle, est exigée
-        sur chaque image : une image non reconnue remet la fenêtre à zéro."""
+        sur chaque image : une image non reconnue remet la fenêtre à zéro.
+
+        Tête nettement tournée : l'image est ignorée (fenêtre remise à zéro), car le
+        modèle de vivant, entraîné surtout sur des visages de face, y juge à tort un
+        vrai visage comme une photo. Un attaquant n'y gagne rien : une image ignorée
+        ne compte jamais pour accepter."""
         rc, lc, k = self.cfg.recognition, self.cfg.liveness, self.cfg.auth.window_frames
         # Seuil personnel (calibration à l'enrôlement), toujours ramené entre les bornes.
         live_t = lc.threshold if liveness_threshold is None else float(np.clip(liveness_threshold, lc.floor, lc.ceiling))
@@ -105,14 +128,29 @@ class Engine:
         window: deque[float] = deque(maxlen=k)
         seen_match = full_window_spoof = False
         pool = ThreadPoolExecutor(max_workers=1) if use_live else None
+        ref_pose = Pose(*reference_pose) if reference_pose else None
+        t_last = time.monotonic()
         try:
             for frame in frames:
+                t_frame = time.monotonic()
+                result.camera_s += t_frame - t_last
+                t_last = t_frame
                 result.frames += 1
                 face = largest(self.detector.detect(frame))
                 if face is None or not self._quality(frame, face).ok:
                     window.clear()
+                    result.compute_s += time.monotonic() - t_frame
+                    t_last = time.monotonic()
+                    continue
+                if self._turned(face, ref_pose):
+                    result.skipped_pose += 1
+                    window.clear()
+                    result.compute_s += time.monotonic() - t_frame
+                    t_last = time.monotonic()
                     continue
                 sim, live = self._analyze(frame, face, templates, pool)
+                result.compute_s += time.monotonic() - t_frame
+                t_last = time.monotonic()
                 result.best_similarity = max(result.best_similarity, sim)
                 if sim < rc.threshold:
                     window.clear()
@@ -140,6 +178,8 @@ class Engine:
                 result.status = Status.SPOOF
             elif seen_match:
                 result.status = Status.TIMEOUT
+            elif result.skipped_pose:
+                result.status = Status.TURNED
             elif result.best_similarity > -1.0:
                 result.status = Status.NO_MATCH
         result.liveness_threshold = result_threshold

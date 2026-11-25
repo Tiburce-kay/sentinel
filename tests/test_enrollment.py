@@ -166,3 +166,41 @@ def test_changement_de_personne_signale():
 def test_plusieurs_visages_signales():
     ev = session().feed(Shot(ME, 1.0, n=2))
     assert "Une seule personne" in ev.hint
+
+
+# --- Authentification et tête tournée (essai réel du 25/11) ----------------------
+
+def auth_engine():
+    return session().e
+
+
+def test_tete_tournee_ignoree_et_pas_prise_pour_une_photo():
+    """Cas réel : de profil, le modèle de vivant juge un vrai visage comme une photo."""
+    T = np.stack([ME])
+    turned = [Shot(ME, -5.0, yaw_deg=-30)] * 8 + [Shot(ME, -5.0, pitch_deg=25)] * 8
+    r = auth_engine().authenticate(turned, T)
+    assert r.status.name == "TURNED" and r.skipped_pose == 16
+
+
+def test_retour_de_face_apres_rotation_accepte():
+    T = np.stack([ME])
+    seq = [Shot(ME, -5.0, yaw_deg=-30)] * 6 + [Shot(ME, 1.0)] * 15
+    r = auth_engine().authenticate(seq, T)
+    assert r.ok and r.skipped_pose == 6
+
+
+def test_photo_de_face_toujours_refusee():
+    T = np.stack([ME])
+    r = auth_engine().authenticate([Shot(ME, -6.0)] * 20, T)
+    assert r.status.name == "SPOOF"
+
+
+def test_reference_de_l_utilisateur_utilisee():
+    """Une personne dont la position naturelle est un peu tournée n'est pas pénalisée."""
+    from sentinel.geometry import Pose, landmarks
+    from tests.head import raw_face
+    natural = Pose.of(landmarks(raw_face(project(rotate(HEAD, yaw_deg=12)))))
+    T = np.stack([ME])
+    seq = [Shot(ME, 1.0, yaw_deg=12)] * 15
+    assert auth_engine().authenticate(seq, T, reference_pose=(natural.yaw, natural.pitch)).ok
+    assert auth_engine().authenticate(seq, T, reference_pose=(natural.yaw - 0.3, natural.pitch)).status.name == "TURNED"
