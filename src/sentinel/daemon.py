@@ -266,7 +266,9 @@ class Handler(socketserver.StreamRequestHandler):
             st.camera_lock.release()
         out = session.finish()
         self.pending = {"user": user, "outcome": out, "camera": camera_id} if out.ok else None
-        log.info("enrôlement user=%s résultat=%s", user, "ok" if out.ok else out.reason)
+        # Uniquement des mesures numériques (relief, vivant) : utiles au réglage, sans biométrie.
+        log.info("enrôlement user=%s résultat=%s mesures=%s", user, "ok" if out.ok else out.reason,
+                 {k: round(v, 3) if isinstance(v, float) else v for k, v in out.stats.items()})
         self.send({"event": "finished", "ok": out.ok, "message": out.reason,
                    "stats": {k: round(v, 3) if isinstance(v, float) else v for k, v in out.stats.items()}})
 
