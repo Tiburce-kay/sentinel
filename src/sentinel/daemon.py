@@ -51,6 +51,13 @@ SERVICES = {
 }
 
 
+def uid_of(user: str) -> int:
+    try:
+        return pwd.getpwnam(user).pw_uid
+    except KeyError:
+        raise Refused("error", f"utilisateur inconnu : {user}") from None
+
+
 class Refused(Exception):
     def __init__(self, status: str, message: str):
         super().__init__(message)
@@ -211,7 +218,7 @@ class Handler(socketserver.StreamRequestHandler):
         if use is None:
             raise Refused("disabled", f"service non pris en charge : {service!r}")
         if use == "screen":
-            use = "lockscreen" if user_has_session(pwd.getpwnam(user).pw_uid) else "login"
+            use = "lockscreen" if user_has_session(uid_of(user)) else "login"
         enr = st.store.load(user)
         if enr is None:
             raise Refused("not_enrolled", Status.NOT_ENROLLED.value)

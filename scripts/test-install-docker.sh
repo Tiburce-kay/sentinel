@@ -27,6 +27,9 @@ echo "=== $PRETTY_NAME"
 cp -r /src /tmp/repo && cd /tmp/repo && rm -rf .venv dev-data
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null 2>&1
+# Conteneur jetable : on le met à jour d'abord, comme on le demanderait à un utilisateur
+# (l'installateur refuse de déclencher lui-même des mises à jour).
+apt-get upgrade -y -qq >/dev/null 2>&1 || fail "mise à jour du conteneur"
 apt-get install -y -qq sudo passwd xvfb xauth >/dev/null 2>&1 || fail "outils de test"
 
 echo "=== 1. installation"

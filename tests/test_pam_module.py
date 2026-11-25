@@ -1,0 +1,145 @@
+"""Module PAM réel (C), chargé par une vraie pile PAM, face à un faux service.
+
+Compile pam_sentinel.so et le programme de test, écrit une configuration PAM dans
+un dossier temporaire (pam_start_confdir : /etc/pam.d n'est jamais touché), et
+rejoue chaque réponse possible du service — dont le parcours complet avec caméra,
+qu'un bug de comparaison de préfixe avait cassé (essai réel du 25/11).
+"""
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import threading
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+pytestmark = pytest.mark.skipif(
+    not (shutil.which("cc") and Path("/usr/include/security/pam_modules.h").exists()),
+    reason="compilateur C ou en-têtes PAM (libpam0g-dev) absents",
+)
+
+
+@pytest.fixture(scope="module")
+def built(tmp_path_factory):
+    out = tmp_path_factory.mktemp("pam")
+    for f in ("pam_sentinel.c", "pam_harness.c", "Makefile"):
+        shutil.copy(ROOT / "pam" / f, out / f)
+    subprocess.run(["make", "-s", "-C", str(out), "all", "harness"], check=True)
+    return out
+
+
+class FakeService:
+    """Faux sentineld : renvoie les lignes prévues, enregistre les requêtes reçues."""
+
+    def __init__(self, path: Path, replies: list[dict]):
+        self.requests: list[dict] = []
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.bind(str(path))
+        self.sock.listen(4)
+        self.replies = replies
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def _serve(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            with conn:
+                self.requests.append(json.loads(conn.makefile().readline()))
+                for r in self.replies:
+                    conn.sendall((json.dumps(r, ensure_ascii=False) + "\n").encode())
+
+    def close(self):
+        self.sock.close()
+
+
+def run(built: Path, tmp: Path, replies, *, user="alice", service="sudo", env=None, notify=False):
+    sock = tmp / "s.sock"
+    conf = tmp / "conf"
+    conf.mkdir(exist_ok=True)
+    opt = "notify" if notify else ""
+    (conf / service).write_text(
+        f"auth sufficient {built}/pam_sentinel.so socket={sock} timeout=3 {opt}\n"
+        "auth required pam_deny.so\n")
+    fake = FakeService(sock, replies) if replies is not None else None
+    try:
+        p = subprocess.run([str(built / "pam-harness"), str(conf), service, user],
+                           capture_output=True, text=True, env={**os.environ, **(env or {})}, timeout=15)
+    finally:
+        if fake:
+            fake.close()
+        sock.unlink(missing_ok=True)
+    return p.stdout, (fake.requests if fake else [])
+
+
+def test_parcours_complet_avec_camera(built, tmp_path):
+    out, reqs = run(built, tmp_path, [{"event": "camera"},
+                                      {"ok": True, "status": "success", "message": "succès"}])
+    assert "regardez la caméra" in out
+    assert "visage reconnu" in out
+    assert "résultat PAM : Success" in out
+    assert reqs == [{"op": "authenticate", "user": "alice", "service": "sudo", "progress": True}]
+
+
+def test_usurpation_refusee_avec_message(built, tmp_path):
+    out, _ = run(built, tmp_path, [{"event": "camera"},
+                                   {"ok": False, "status": "spoof", "message": "usurpation suspectée"}])
+    assert "regardez la caméra" in out and "usurpation suspectée" in out
+    assert "Success" not in out
+
+
+def test_succes_sans_message_camera(built, tmp_path):
+    out, _ = run(built, tmp_path, [{"ok": True, "status": "success", "message": "succès"}])
+    assert "résultat PAM : Success" in out and "regardez" not in out
+
+
+@pytest.mark.parametrize("status", ["not_enrolled", "disabled"])
+def test_silencieux_si_visage_absent_ou_desactive(built, tmp_path, status):
+    out, _ = run(built, tmp_path, [{"ok": False, "status": status, "message": "x"}])
+    assert "[message]" not in out and "Success" not in out
+
+
+def test_mot_de_passe_requis_affiche(built, tmp_path):
+    out, _ = run(built, tmp_path, [{"ok": False, "status": "password_required",
+                                    "message": "mot de passe requis"}])
+    assert "mot de passe requis" in out and "regardez" not in out
+
+
+def test_service_absent(built, tmp_path):
+    out, _ = run(built, tmp_path, None)
+    assert "Success" not in out and "[message]" not in out
+
+
+def test_service_muet_delai_respecte(built, tmp_path):
+    """Le service accepte mais ne répond jamais : le module abandonne après le délai."""
+    import time
+    t = time.monotonic()
+    out, _ = run(built, tmp_path, [])
+    assert "Success" not in out and time.monotonic() - t < 8
+
+
+def test_connexion_distante_aucune_requete(built, tmp_path):
+    out, reqs = run(built, tmp_path, [{"ok": True}], env={"PAM_RHOST": "203.0.113.7"})
+    assert reqs == [] and "Success" not in out
+
+
+def test_nom_piege_aucune_requete(built, tmp_path):
+    out, reqs = run(built, tmp_path, [{"ok": True}], user='a", "op": "remove')
+    assert reqs == [] and "Success" not in out
+
+
+def test_reponse_falsifiee_sans_ok_refusee(built, tmp_path):
+    """Seule une réponse commençant exactement par {"ok": true compte comme un succès."""
+    out, _ = run(built, tmp_path, [{"status": "success", "ok": True}])
+    assert "Success" not in out
+
+
+def test_notification_mot_de_passe(built, tmp_path):
+    out, reqs = run(built, tmp_path, [{"ok": True}], notify=True)
+    assert reqs == [{"op": "password_ok", "user": "alice"}]

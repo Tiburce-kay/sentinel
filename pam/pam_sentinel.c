@@ -176,6 +176,13 @@ static void conn_close(struct conn *c)
     c->fd = -1;
 }
 
+/* Préfixe comparé sur sa longueur exacte (une longueur écrite à la main a déjà
+ * causé un bug : le message « caméra » n'était jamais reconnu). */
+static int starts_with(const char *s, const char *prefix)
+{
+    return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
 /* Extrait la valeur texte d'une clé (réponses JSON du service, format connu). */
 static void json_string(const char *json, const char *key, char *out, size_t out_len)
 {
@@ -241,7 +248,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     struct conn c;
     int ok = conn_open(&c, o.socket, request, o.timeout_s) == 0 && conn_line(&c, resp, sizeof(resp)) == 0;
-    if (ok && strncmp(resp, "{\"event\": \"camera\"", 19) == 0) {
+    if (ok && starts_with(resp, "{\"event\": \"camera\"")) {
         /* Le service va allumer la caméra : c'est le moment de le dire. */
         if (!o.quiet)
             pam_info(pamh, "Sentinel : regardez la caméra…");
@@ -254,7 +261,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         return PAM_AUTHINFO_UNAVAIL;
     }
 
-    if (strncmp(resp, "{\"ok\": true", 11) == 0) {
+    if (starts_with(resp, "{\"ok\": true")) {
         if (!o.quiet)
             pam_info(pamh, "Sentinel : visage reconnu.");
         return PAM_SUCCESS;

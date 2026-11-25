@@ -1,5 +1,6 @@
 """Service sentineld de bout en bout : vrai socket Unix, caméra et modèles simulés."""
 
+import os
 import threading
 
 import pytest
@@ -13,6 +14,12 @@ from sentinel.vision import Quality
 from tests.test_enrollment import ME, OTHER, POSES, Detector, Liveness, Recognizer, Shot
 
 PASSWORD = "bon-mot-de-passe"
+
+
+class FakePeer(d.Peer):
+    @property
+    def username(self) -> str:
+        return "alice"
 
 
 class FakeCamera:
@@ -46,6 +53,10 @@ def service(tmp_path, monkeypatch):
     state.store.init()
     state.scenes = enrollment_scenes()
     state.open_camera = lambda: FakeCamera(state.scenes)
+    # Appelant simulé : un utilisateur ordinaire, quel que soit l'utilisateur qui lance
+    # les tests (en conteneur, c'est root, à qui le service accorde tout).
+    monkeypatch.setattr(d, "peer_of", lambda sock: FakePeer(os.getpid(), 4242, 4242))
+    monkeypatch.setattr(d, "uid_of", lambda user: 4242)
     monkeypatch.setattr(d, "in_active_local_session", lambda peer: state.local)
     monkeypatch.setattr(d, "user_has_session", lambda uid: True)
     import sentinel.pamauth

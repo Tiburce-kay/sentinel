@@ -57,5 +57,6 @@ def test_fichier_reel_de_cette_machine():
     real = Path("/etc/pam.d/sudo")
     if not real.exists():
         pytest.skip("pas de /etc/pam.d/sudo")
-    text = real.read_text()
-    assert disable(enable(text)).strip() == text.strip()
+    text = real.read_text()  # peut déjà contenir les lignes Sentinel
+    assert disable(enable(text)).strip() == disable(text).strip()
+    assert is_enabled(enable(text))
