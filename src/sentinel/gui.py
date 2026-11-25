@@ -126,6 +126,110 @@ def in_thread(work, done) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
+# --- Compatibilité : libadwaita 1.1+ et GTK 4.6+ ---------------------------------
+# Ubuntu 22.04 / Mint 21 : libadwaita 1.1, GTK 4.6 ; Debian 12 : 1.2 et 4.8. Les
+# composants récents sont utilisés quand ils existent, sinon un équivalent ancien.
+
+def fg_color(widget: Gtk.Widget) -> Gdk.RGBA:
+    if hasattr(widget, "get_color"):  # GTK 4.10+
+        return widget.get_color()
+    return widget.get_style_context().get_color()
+
+
+def load_css(provider: Gtk.CssProvider, css: str) -> None:
+    if hasattr(provider, "load_from_string"):  # GTK 4.12+
+        provider.load_from_string(css)
+    else:
+        provider.load_from_data(css.encode())
+
+
+def window_layout(window: Adw.ApplicationWindow, content: Gtk.Widget) -> Gtk.Widget:
+    """Barre de titre + contenu. Renvoie le conteneur (pour l'éclairage par l'écran)."""
+    if hasattr(Adw, "ToolbarView"):  # libadwaita 1.4+
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(content)
+    else:
+        view = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        view.append(Adw.HeaderBar())
+        view.append(content)
+    window.set_content(view)
+    return view
+
+
+class SwitchRow:
+    """Ligne avec interrupteur : Adw.SwitchRow (1.4+) ou Adw.ActionRow + Gtk.Switch."""
+
+    def __init__(self, title: str, subtitle: str, active: bool = False, sensitive: bool = True):
+        if hasattr(Adw, "SwitchRow"):
+            self.row = Adw.SwitchRow(title=title, subtitle=subtitle, active=active, sensitive=sensitive)
+            self._switch = None
+        else:
+            self._switch = Gtk.Switch(active=active, valign=Gtk.Align.CENTER)
+            self.row = Adw.ActionRow(title=title, subtitle=subtitle, sensitive=sensitive,
+                                     activatable_widget=self._switch)
+            self.row.add_suffix(self._switch)
+
+    def get_active(self) -> bool:
+        return (self._switch or self.row).get_active()
+
+    def set_active(self, value: bool) -> None:
+        (self._switch or self.row).set_active(value)
+
+
+class PasswordRow:
+    """Saisie de mot de passe : Adw.PasswordEntryRow (1.2+) ou Gtk.PasswordEntry dans une ligne."""
+
+    def __init__(self, title: str, on_activate):
+        if hasattr(Adw, "PasswordEntryRow"):
+            self.row = Adw.PasswordEntryRow(title=title)
+            self.row.connect("entry-activated", lambda *_: on_activate())
+            self._entry = self.row
+        else:
+            self._entry = Gtk.PasswordEntry(show_peek_icon=True, hexpand=True, valign=Gtk.Align.CENTER)
+            self._entry.connect("activate", lambda *_: on_activate())
+            self.row = Adw.ActionRow(title=title)
+            self.row.add_suffix(self._entry)
+
+    def get_text(self) -> str:
+        return self._entry.get_text()
+
+    def set_text(self, text: str) -> None:
+        self._entry.set_text(text)
+
+
+def confirm_dialog(parent: Gtk.Window, heading: str, body: str, extra: Gtk.Widget,
+                   action: str, on_confirm) -> None:
+    """Dialogue de confirmation destructive : Adw.AlertDialog (1.5+), Adw.MessageDialog
+    (1.2+) ou Gtk.MessageDialog."""
+    def respond(_d, response):
+        if response in ("ok", Gtk.ResponseType.OK):
+            on_confirm()
+
+    if hasattr(Adw, "AlertDialog") or hasattr(Adw, "MessageDialog"):
+        modern = hasattr(Adw, "AlertDialog")
+        dialog = (Adw.AlertDialog(heading=heading, body=body) if modern
+                  else Adw.MessageDialog(transient_for=parent, heading=heading, body=body))
+        dialog.set_extra_child(extra)
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("ok", action)
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", respond)
+        dialog.present(parent) if modern else dialog.present()
+        return
+    dialog = Gtk.MessageDialog(transient_for=parent, modal=True, text=heading, secondary_text=body,
+                               message_type=Gtk.MessageType.WARNING)
+    dialog.add_button("Annuler", Gtk.ResponseType.CANCEL)
+    dialog.add_button(action, Gtk.ResponseType.OK)
+    dialog.get_message_area().append(extra)
+
+    def done(d, response):
+        d.destroy()
+        respond(d, response)
+    dialog.connect("response", done)
+    dialog.present()
+
+
 # --- Composants ----------------------------------------------------------------
 
 class CameraRing(Gtk.Widget):
@@ -152,7 +256,7 @@ class CameraRing(Gtk.Widget):
 
     def do_snapshot(self, snap: Gtk.Snapshot) -> None:
         w, h = self.get_width(), self.get_height()
-        fg = self.get_color()
+        fg = fg_color(self)
         cx, cy = w / 2, h / 2
         ring_r = min(w, h) / 2 - 7
         disc_r = ring_r - 16
@@ -211,10 +315,7 @@ class Wizard(Adw.ApplicationWindow):
         self.cancelled = False
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT, vexpand=True)
-        self.view = Adw.ToolbarView()
-        self.view.add_top_bar(Adw.HeaderBar())
-        self.view.set_content(self.stack)
-        self.set_content(self.view)
+        self.view = window_layout(self, self.stack)
         for name, builder in (("welcome", self._welcome), ("capture", self._capture),
                               ("verify", self._verify), ("confirm", self._confirm),
                               ("done", self._done), ("error", self._error)):
@@ -307,22 +408,19 @@ class Wizard(Adw.ApplicationWindow):
     def _confirm(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         uses = Adw.PreferencesGroup(title="Utiliser mon visage pour")
-        self.use_sudo = Adw.SwitchRow(title="Commandes administrateur",
-                                      subtitle="sudo, dans le terminal", active=True)
-        self.use_lock = Adw.SwitchRow(title="Écran de verrouillage",
-                                      subtitle="Déverrouiller la session déjà ouverte", active=True)
-        self.use_login = Adw.SwitchRow(title="Connexion au démarrage", sensitive=False,
-                                       subtitle="Au démarrage, votre mot de passe reste demandé : "
-                                                "il déverrouille aussi votre trousseau de mots de passe.")
+        self.use_sudo = SwitchRow("Commandes administrateur", "sudo, dans le terminal", active=True)
+        self.use_lock = SwitchRow("Écran de verrouillage", "Déverrouiller la session déjà ouverte", active=True)
+        self.use_login = SwitchRow("Connexion au démarrage",
+                                   "Au démarrage, votre mot de passe reste demandé : "
+                                   "il déverrouille aussi votre trousseau de mots de passe.", sensitive=False)
         for row in (self.use_sudo, self.use_lock, self.use_login):
-            uses.add(row)
+            uses.add(row.row)
         box.append(uses)
         confirm = Adw.PreferencesGroup(title="Confirmation",
                                        description="Saisissez votre mot de passe pour autoriser "
                                                    "l'enregistrement de votre visage.")
-        self.password = Adw.PasswordEntryRow(title="Mot de passe")
-        self.password.connect("entry-activated", lambda *_: self._commit())
-        confirm.add(self.password)
+        self.password = PasswordRow("Mot de passe", self._commit)
+        confirm.add(self.password.row)
         box.append(confirm)
         self.confirm_error = Gtk.Label(wrap=True)
         self.confirm_error.add_css_class("error")
@@ -498,19 +596,9 @@ class Wizard(Adw.ApplicationWindow):
         self._connect()
 
     def _ask_remove(self) -> None:
-        dialog = Adw.AlertDialog(heading="Supprimer votre visage ?",
-                                 body="Sentinel ne pourra plus vous reconnaître. "
-                                      "Confirmez avec votre mot de passe.")
         entry = Gtk.PasswordEntry(show_peek_icon=True)
-        dialog.set_extra_child(entry)
-        dialog.add_response("cancel", "Annuler")
-        dialog.add_response("remove", "Supprimer")
-        dialog.set_response_appearance("remove", Adw.ResponseAppearance.DESTRUCTIVE)
 
-        def on_response(_d, response):
-            if response != "remove":
-                return
-
+        def confirmed():
             def done(result):
                 if isinstance(result, Exception) or not result.get("ok"):
                     msg = str(result) if isinstance(result, Exception) else result.get("message", "")
@@ -518,13 +606,20 @@ class Wizard(Adw.ApplicationWindow):
                 else:
                     self._connect()
             in_thread(lambda: self.backend.remove(entry.get_text()), done)
-        dialog.connect("response", on_response)
-        dialog.present(self)
+
+        confirm_dialog(self, "Supprimer votre visage ?",
+                       "Sentinel ne pourra plus vous reconnaître. Confirmez avec votre mot de passe.",
+                       entry, "Supprimer", confirmed)
 
     # -- Captures d'écran (documentation, tests) ------------------------------------
 
     def _snapshot(self, name: str) -> bool:
         w, h = self.get_width(), self.get_height()
+        if self.get_renderer() is None or w == 0 or h == 0:
+            GLib.timeout_add(100, self._snapshot, name)  # pas encore affichée : réessai rapide
+            return False
+        if self.stack.get_visible_child_name() != name:
+            return False  # la page a déjà changé
         paintable = Gtk.WidgetPaintable.new(self)
         snap = Gtk.Snapshot()
         paintable.snapshot(snap, w, h)
@@ -543,7 +638,7 @@ class App(Adw.Application):
 
     def do_activate(self) -> None:
         provider = Gtk.CssProvider()
-        provider.load_from_string(CSS)
+        load_css(provider, CSS)
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
                                                   Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         win = Wizard(self, self.backend_factory, self.snapshot_dir)

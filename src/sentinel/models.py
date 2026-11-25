@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 (Ubuntu 22.04, Mint 21…)
+    import tomli as tomllib
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
