@@ -1,0 +1,13 @@
+# Configuration de Sentinel. Ce fichier doit appartenir à root (0644).
+# Toutes les options et leurs valeurs par défaut : src/sentinel/config.py
+data_dir = "/var/lib/sentinel"
+models_dir = "/usr/share/sentinel/models"
+socket_path = "/run/sentinel/sentinel.sock"
+strict_permissions = true
+
+[auth]
+timeout_s = 4.0
+# Comme Face ID : mot de passe au premier déverrouillage, puis toutes les 48 h.
+require_password_after_boot = true
+password_every_h = 48.0
+max_failures = 5

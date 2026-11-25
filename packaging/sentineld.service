@@ -1,0 +1,49 @@
+[Unit]
+Description=Sentinel — authentification faciale locale
+Documentation=https://github.com/Tiburce-kay/sentinel
+After=systemd-logind.service
+
+[Service]
+Type=simple
+ExecStart=/opt/sentinel/venv/bin/sentineld
+Environment=SENTINEL_CONFIG=/etc/sentinel/config.toml
+Restart=on-failure
+RestartSec=2
+
+# Socket dans /run/sentinel, gabarits dans /var/lib/sentinel (créés par systemd).
+RuntimeDirectory=sentinel
+RuntimeDirectoryMode=0755
+StateDirectory=sentinel
+StateDirectoryMode=0700
+
+# --- Isolation -----------------------------------------------------------------
+# Aucun réseau : la biométrie ne peut techniquement pas quitter la machine.
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+# Seul périphérique accessible : la caméra.
+DevicePolicy=closed
+DeviceAllow=char-video4linux rw
+# Système de fichiers en lecture seule, sauf /var/lib/sentinel et /run/sentinel.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# Aucune capacité root particulière, aucune élévation de privilèges.
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

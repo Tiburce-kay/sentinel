@@ -1,0 +1,4 @@
+# Sentinel : confirmation par mot de passe (enregistrement du visage, réglages).
+# Uniquement pam_unix : le visage ne peut jamais confirmer… le visage.
+auth     required  pam_unix.so
+account  required  pam_unix.so

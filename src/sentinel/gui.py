@@ -282,7 +282,12 @@ class Wizard(Adw.ApplicationWindow):
 
     def _verify(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.verify_spinner = Adw.Spinner(halign=Gtk.Align.CENTER, width_request=32, height_request=32)
+        # Adw.Spinner date de libadwaita 1.6 (Ubuntu 24.04 a la 1.5) : repli sur Gtk.Spinner.
+        if hasattr(Adw, "Spinner"):
+            self.verify_spinner = Adw.Spinner(halign=Gtk.Align.CENTER, width_request=32, height_request=32)
+        else:
+            self.verify_spinner = Gtk.Spinner(halign=Gtk.Align.CENTER, spinning=True,
+                                              width_request=32, height_request=32)
         box.append(self.verify_spinner)
         buttons = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER)
         self.verify_retry = Gtk.Button(label="Réessayer", visible=False)

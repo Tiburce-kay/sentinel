@@ -129,7 +129,8 @@ class Handler(socketserver.StreamRequestHandler):
     # --- E/S -----------------------------------------------------------------
 
     def send(self, msg: dict) -> None:
-        self.wfile.write((json.dumps(msg) + "\n").encode())
+        # Accents transmis tels quels (UTF-8) : le module PAM affiche les messages bruts.
+        self.wfile.write((json.dumps(msg, ensure_ascii=False) + "\n").encode())
         self.wfile.flush()
 
     def handle(self) -> None:
@@ -197,6 +198,7 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("forbidden", "réservé à root")
         user = validate_username(req.get("user", ""))
         self.state.mark_password(user)
+        log.info("mot de passe validé user=%s (verrou levé)", user)
         self.send({"ok": True})
 
     def op_authenticate(self, req: dict) -> None:
@@ -222,6 +224,10 @@ class Handler(socketserver.StreamRequestHandler):
         if not st.camera_lock.acquire(blocking=False):
             raise Refused("busy", "caméra déjà utilisée par Sentinel")
         try:
+            if req.get("progress"):
+                # Prévient le client (module PAM) juste avant d'allumer la caméra :
+                # « regardez la caméra » ne s'affiche que si elle sert vraiment.
+                self.send({"event": "camera"})
             with st.open_camera() as cam:
                 if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
                     raise Refused("camera", "caméra différente de celle de l'enrôlement")
@@ -392,12 +398,18 @@ def main(argv: list[str] | None = None) -> int:
         state.store.check_permissions()
     state.get_engine()  # modèles chargés une fois, au démarrage
     path = args.socket or cfg.socket_path
+    import signal
+
+    # Arrêt propre sur SIGTERM (systemd) comme sur Ctrl+C : le socket est retiré.
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     with make_server(state, path) as srv:
         log.info("prêt sur %s", path)
         try:
             srv.serve_forever()
         except KeyboardInterrupt:
             pass
+        finally:
+            path.unlink(missing_ok=True)
     return 0
 
 

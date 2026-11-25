@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Sentinel
+GenericName=Reconnaissance faciale
+Comment=Déverrouiller votre PC avec votre visage
+Exec=sentinel-setup
+Icon=camera-web
+Terminal=false
+Categories=Settings;Security;
+Keywords=visage;face;biométrie;déverrouillage;sudo;

@@ -6,3 +6,7 @@ __pycache__/
 models/*.onnx
 # Données locales de développement (jamais versionnées)
 dev-data/
+
+# Binaires compilés
+pam/pam_sentinel.so
+pam/pam-harness

@@ -29,6 +29,26 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 - **Modèles d'IA vérifiés** par SHA-256 avant chargement.
 - **Licences compatibles avec un usage commercial** (MIT, Apache-2.0).
 
+## Installation (Debian, Ubuntu, Kali)
+
+```bash
+git clone <url-du-depot> sentinel && cd sentinel
+sudo scripts/install.sh            # service isolé, module PAM, assistant graphique
+```
+
+1. Lancez **Sentinel** depuis le menu des applications et enregistrez votre visage.
+2. Activez le visage pour `sudo` — **en gardant un terminal root ouvert par sécurité** :
+
+   ```bash
+   sudo -i                          # dans un AUTRE terminal, à laisser ouvert
+   sudo sentinel-pam enable sudo
+   sudo -k && sudo true             # test, dans un nouveau terminal
+   ```
+
+Le mot de passe reste toujours possible : en cas d'échec, de délai ou de panne, `sudo`
+le demande comme d'habitude. Désactiver : `sudo sentinel-pam disable sudo`.
+Désinstaller (données de visage supprimées) : `sudo scripts/uninstall.sh`.
+
 ## Essai (mode développement)
 
 ```bash
@@ -42,7 +62,7 @@ export SENTINEL_CONFIG=config.dev.toml        # stockage local, sans root
 .venv/bin/sentinel test                       # teste, sans rien déverrouiller
 .venv/bin/sentinel calibrate reel             # mesure les scores (voir docs/CALIBRATION.md)
 
-.venv/bin/python -m pytest                    # 90 tests
+.venv/bin/python -m pytest                    # 97 tests
 
 # Service + assistant graphique (deux terminaux)
 .venv/bin/sentineld                           # terminal 1
