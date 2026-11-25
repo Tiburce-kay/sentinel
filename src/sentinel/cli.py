@@ -129,6 +129,35 @@ def cmd_test(cfg: Config, args) -> int:
     return 0 if res.ok else 1
 
 
+def cmd_calibrate(cfg: Config, args) -> int:
+    from . import calibrate as cal
+
+    csv_path = cfg.data_dir / "calibration.csv"
+    if args.report:
+        if not csv_path.exists():
+            print("Aucune mesure : lancer d'abord « sentinel calibrate reel ».")
+            return 1
+        print(cal.report(cal.load(csv_path), cfg.recognition.threshold,
+                         cfg.liveness.threshold, cfg.recognition.required_frames))
+        return 0
+    if not args.label:
+        print("Préciser une étiquette (reel, autre, photo-ecran, photo-papier, video…) ou --report.")
+        return 2
+    user = _target_user(args)
+    enr = TemplateStore(cfg.data_dir, cfg.strict_permissions).load(user)
+    if enr is None:
+        print(f"Aucun visage enregistré pour « {user} » : lancer d'abord « sentinel enroll ».")
+        return 1
+    engine = _engine(cfg)
+    print(f"Mesure « {args.label} » pendant {args.duration:.0f} s (aucune image n'est conservée)…")
+    with _camera(cfg) as cam:
+        rows = cal.record(engine, cam.frames(args.duration), enr.embeddings, args.label)
+    cal.append(csv_path, rows)
+    faces = sum(r.face for r in rows)
+    print(f"{len(rows)} images mesurées, dont {faces} avec un visage. Résultats : sentinel calibrate --report")
+    return 0
+
+
 def cmd_list(cfg: Config, args) -> int:
     store = TemplateStore(cfg.data_dir, cfg.strict_permissions)
     for user in store.users():
@@ -153,9 +182,13 @@ def main(argv: list[str] | None = None) -> int:
     e = sub.add_parser("enroll", help="enregistre votre visage")
     e.add_argument("--replace", action="store_true", help="remplace l'enrôlement existant")
     sub.add_parser("test", help="teste la reconnaissance, sans rien déverrouiller")
+    c = sub.add_parser("calibrate", help="mesure les scores réels (aucune image conservée)")
+    c.add_argument("label", nargs="?", help="reel, autre, photo-ecran, photo-papier, video…")
+    c.add_argument("--duration", type=float, default=20.0, help="durée en secondes (défaut 20)")
+    c.add_argument("--report", action="store_true", help="affiche l'analyse des mesures")
     sub.add_parser("list", help="liste les utilisateurs enrôlés")
     sub.add_parser("remove", help="supprime votre visage")
-    for name in ("enroll", "test", "remove"):
+    for name in ("enroll", "test", "remove", "calibrate"):
         sub.choices[name].add_argument("--user", help="utilisateur visé (root uniquement)")
     args = p.parse_args(argv)
 
@@ -165,8 +198,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = load_config()
         return {"init": cmd_init, "doctor": cmd_doctor, "enroll": cmd_enroll, "test": cmd_test,
-                "list": cmd_list, "remove": cmd_remove}[args.cmd](cfg, args)
-    except (ConfigError, StoreError, ModelError, CameraError) as exc:
+                "calibrate": cmd_calibrate, "list": cmd_list, "remove": cmd_remove}[args.cmd](cfg, args)
+    except (ConfigError, StoreError, ModelError, CameraError, ValueError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

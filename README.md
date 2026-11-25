@@ -32,7 +32,7 @@ export SENTINEL_CONFIG=config.dev.toml        # stockage local, sans root
 .venv/bin/sentinel enroll                     # enregistre votre visage
 .venv/bin/sentinel test                       # teste, sans rien déverrouiller
 
-.venv/bin/python -m pytest                    # 50 tests
+.venv/bin/python -m pytest                    # 54 tests
 ```
 
 ## Modèles
