@@ -31,6 +31,10 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 
 ## Installation (Debian, Ubuntu, Kali)
 
+Testée de bout en bout (installation, vrai `sudo`, désinstallation) sur **Kali rolling** et
+**Ubuntu 24.04** : `scripts/test-install-docker.sh [image]`. L'assistant graphique demande
+libadwaita ≥ 1.5 (Ubuntu 24.04, Debian 13, Kali).
+
 ```bash
 git clone <url-du-depot> sentinel && cd sentinel
 sudo scripts/install.sh            # service isolé, module PAM, assistant graphique
