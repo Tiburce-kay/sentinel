@@ -93,3 +93,17 @@ Angles mesurés lors de l'essai 2 (écart à la position de face) : gauche +0,14
 droite −0,223, haut −0,083, bas +0,134 (lacet, puis tangage). Les quatre directions sont
 reconnues dans le bon sens ; le seuil de tangage passe de 0,08 à 0,06, « haut » ayant
 été atteint de justesse.
+
+## Essais d'usage réel (25/11/2026, soir)
+
+Après le réenrôlement (position de face mémorisée), `sentinel test` en conditions
+ordinaires (terminal, sans écran blanc) :
+
+| Situation | Essais | Résultat |
+|---|---|---|
+| Utilisateur de face, y compris grimaces | 9 | 9 succès, 1,15 à 1,44 s (2,56 s au premier essai, processeur « froid ») ; similarité min. 0,69 |
+| Utilisateur, tête tournée en permanence | 4 | « tête trop tournée » ou délai ; aucune fausse « usurpation » |
+| Autre personne | 4 | 4 refus ; similarité 0,16 à 0,23 |
+
+Calcul : ~120 ms par image de face sur i5-6300U ; la caméra n'attend presque jamais.
+Les lenteurs observées plus tôt (3,3 à 3,8 s) venaient d'un processeur occupé (vidéo).

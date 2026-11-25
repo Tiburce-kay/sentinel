@@ -178,10 +178,12 @@ class Engine:
                 result.status = Status.SPOOF
             elif seen_match:
                 result.status = Status.TIMEOUT
+            elif result.best_similarity > -1.0:
+                # Un visage de face a été analysé et n'est pas le bon : c'est un échec
+                # (compté pour le verrouillage), même si d'autres images étaient tournées.
+                result.status = Status.NO_MATCH
             elif result.skipped_pose:
                 result.status = Status.TURNED
-            elif result.best_similarity > -1.0:
-                result.status = Status.NO_MATCH
         result.liveness_threshold = result_threshold
         result.elapsed_s = time.monotonic() - start
         return result

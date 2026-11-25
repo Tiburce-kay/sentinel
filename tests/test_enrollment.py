@@ -204,3 +204,11 @@ def test_reference_de_l_utilisateur_utilisee():
     seq = [Shot(ME, 1.0, yaw_deg=12)] * 15
     assert auth_engine().authenticate(seq, T, reference_pose=(natural.yaw, natural.pitch)).ok
     assert auth_engine().authenticate(seq, T, reference_pose=(natural.yaw - 0.3, natural.pitch)).status.name == "TURNED"
+
+
+def test_autre_personne_tete_parfois_tournee_reste_un_echec():
+    """Cas réel : un imposteur vu de face puis de profil doit être « non reconnu »
+    (compté pour le verrouillage), pas « tête trop tournée »."""
+    T = np.stack([ME])
+    seq = [Shot(OTHER, 1.0)] * 5 + [Shot(OTHER, 1.0, yaw_deg=-30)] * 25
+    assert auth_engine().authenticate(seq, T).status.name == "NO_MATCH"
