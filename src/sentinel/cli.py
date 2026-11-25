@@ -124,12 +124,19 @@ def cmd_enroll(cfg: Config, args) -> int:
     return 0
 
 
+def _no_store_hint(cfg: Config) -> str:
+    if cfg.data_dir.exists():
+        return ""
+    return (f"\n  Le stockage {cfg.data_dir} n'existe pas. En développement, avez-vous oublié"
+            f"\n  « export SENTINEL_CONFIG=config.dev.toml » dans ce terminal ?")
+
+
 def cmd_test(cfg: Config, args) -> int:
     user = _target_user(args)
     store = TemplateStore(cfg.data_dir, cfg.strict_permissions)
     enr = store.load(user)
     if enr is None:
-        print(f"Aucun visage enregistré pour « {user} ».")
+        print(f"Aucun visage enregistré pour « {user} ».{_no_store_hint(cfg)}")
         return 1
     engine = _engine(cfg)
     with _camera(cfg) as cam:
