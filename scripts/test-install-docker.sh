@@ -35,7 +35,7 @@ apt-get install -y -qq sudo passwd xvfb xauth >/dev/null 2>&1 || fail "outils de
 echo "=== 1. installation"
 sh scripts/install.sh > /tmp/install.log 2>&1 || { tail -25 /tmp/install.log; fail "install.sh"; }
 PY=/opt/sentinel/venv/bin/python
-ok "installé — $($PY --version), libadwaita $($PY -c 'import gi; gi.require_version("Adw","1"); from gi.repository import Adw; print(f"{Adw.get_major_version()}.{Adw.get_minor_version()}")'), GTK $($PY -c 'import gi; gi.require_version("Gtk","4.0"); from gi.repository import Gtk; print(f"{Gtk.get_major_version()}.{Gtk.get_minor_version()}")')"
+ok "installé — $($PY --version), libadwaita $(/usr/bin/python3 -c 'import gi; gi.require_version("Adw","1"); from gi.repository import Adw; print(f"{Adw.get_major_version()}.{Adw.get_minor_version()}")'), GTK $(/usr/bin/python3 -c 'import gi; gi.require_version("Gtk","4.0"); from gi.repository import Gtk; print(f"{Gtk.get_major_version()}.{Gtk.get_minor_version()}")')"
 
 echo "=== 2. suite de tests"
 /opt/sentinel/venv/bin/pip install -q pytest >/dev/null 2>&1
