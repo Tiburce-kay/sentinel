@@ -52,6 +52,8 @@ class _Logind:
             self.lib.sd_uid_get_sessions.argtypes = [ctypes.c_uint, ctypes.c_int,
                                                      ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))]
             self.lib.sd_uid_get_display.argtypes = [ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p)]
+            for fn in ("sd_session_get_class", "sd_session_get_type", "sd_session_get_state"):
+                getattr(self.lib, fn).argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
             self.libc.free.argtypes = [ctypes.c_void_p]
 
     def _take(self, ptr: ctypes.c_void_p) -> str:
@@ -92,21 +94,39 @@ class _Logind:
             return False
         return bool(self._take(seat))
 
-    def has_session(self, uid: int) -> bool:
-        """L'utilisateur a-t-il déjà une session ouverte ? (déverrouillage vs connexion)"""
+    def _prop(self, fn: str, session: str) -> str:
+        out = ctypes.c_void_p()
+        if getattr(self.lib, fn)(session.encode(), ctypes.byref(out)) < 0:
+            return ""
+        return self._take(out)
+
+    def sessions(self, uid: int) -> list[dict]:
+        """Sessions de l'utilisateur : classe, type, état."""
         if not self.lib:
-            return False
+            return []
         arr = ctypes.POINTER(ctypes.c_void_p)()
         n = self.lib.sd_uid_get_sessions(uid, 0, ctypes.byref(arr))
-        if n < 0:
-            return False
-        if arr:
+        names = []
+        if n > 0 and arr:
             i = 0
             while arr[i]:
+                names.append(ctypes.string_at(arr[i]).decode(errors="replace"))
                 self.libc.free(arr[i])
                 i += 1
+        if arr:
             self.libc.free(ctypes.cast(arr, ctypes.c_void_p).value)
-        return n > 0
+        return [{"name": s, "class": self._prop("sd_session_get_class", s),
+                 "type": self._prop("sd_session_get_type", s),
+                 "state": self._prop("sd_session_get_state", s)} for s in names]
+
+
+def has_graphical_session(sessions: list[dict]) -> bool:
+    """Une vraie session graphique ouverte (et non en cours de fermeture) ? C'est ce
+    qui distingue un déverrouillage d'une nouvelle connexion. Les sessions « manager »
+    (gestionnaire de services de l'utilisateur), qui peuvent survivre brièvement à une
+    déconnexion, ne comptent pas."""
+    return any(s["class"] == "user" and s["type"] in ("wayland", "x11") and s["state"] != "closing"
+               for s in sessions)
 
 
 _logind = _Logind()
@@ -119,4 +139,4 @@ def in_active_local_session(peer: Peer) -> bool:
 
 
 def user_has_session(uid: int) -> bool:
-    return _logind.has_session(uid)
+    return has_graphical_session(_logind.sessions(uid))
