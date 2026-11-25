@@ -31,8 +31,9 @@ export SENTINEL_CONFIG=config.dev.toml        # stockage local, sans root
 .venv/bin/sentinel doctor                     # vérifie modèles, caméra, droits
 .venv/bin/sentinel enroll                     # enregistre votre visage
 .venv/bin/sentinel test                       # teste, sans rien déverrouiller
+.venv/bin/sentinel calibrate reel             # mesure les scores (voir docs/CALIBRATION.md)
 
-.venv/bin/python -m pytest                    # 54 tests
+.venv/bin/python -m pytest                    # 57 tests
 ```
 
 ## Modèles

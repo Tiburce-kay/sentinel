@@ -7,8 +7,11 @@ permet de tester toute la logique de décision sans caméra ni visage réel.
 from __future__ import annotations
 
 import enum
+import math
 import time
+from collections import deque
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -34,6 +37,7 @@ class Status(enum.Enum):
     SUCCESS = "succès"
     NO_MATCH = "visage non reconnu"
     NO_FACE = "aucun visage détecté"
+    TIMEOUT = "délai écoulé avant confirmation (restez face à la caméra)"
     SPOOF = "usurpation suspectée (photo, écran ou vidéo)"
     LOCKED = "trop d'échecs : mot de passe requis"
     NOT_ENROLLED = "aucun visage enregistré"
@@ -45,6 +49,7 @@ class AuthResult:
     frames: int = 0
     best_similarity: float = -1.0
     liveness_scores: list[float] = field(default_factory=list)
+    window_liveness: float = -math.inf   # meilleure moyenne de vivant sur une fenêtre complète
     elapsed_s: float = 0.0
 
     @property
@@ -67,46 +72,68 @@ class Engine:
 
     # --- Authentification -----------------------------------------------------
 
+    def _analyze(self, frame: np.ndarray, face: Face, templates: np.ndarray, pool) -> tuple[float, float]:
+        """Similarité et score de vivant. Les deux modèles tournent en parallèle :
+        OpenCV et ONNX Runtime libèrent le verrou de Python pendant le calcul."""
+        fut = pool.submit(self.liveness.score, frame, face) if pool is not None else None
+        sim = best_similarity(self.recognizer.embed(frame, face), templates)
+        live = fut.result() if fut is not None else float("nan")
+        return sim, live
+
     def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray) -> AuthResult:
-        """Accepte si `required_frames` images CONSÉCUTIVES montrent le bon visage,
-        chacune jugée vivante. Une seule image douteuse remet le compteur à zéro :
-        un attaquant ne peut pas accumuler des succès isolés."""
-        rc, lc = self.cfg.recognition, self.cfg.liveness
+        """Accepte quand `window_frames` images CONSÉCUTIVES montrent chacune un visage
+        de qualité, reconnu comme le bon, ET que la moyenne de leurs scores de vivant
+        dépasse le seuil.
+
+        Pourquoi une moyenne : sur une webcam ordinaire, le score de vivant d'un vrai
+        visage varie beaucoup d'une image à l'autre, et une photo produit parfois une
+        image isolée « vivante ». En moyenne sur la fenêtre, les deux populations sont
+        nettement séparées (voir docs/CALIBRATION.md). L'identité, elle, est exigée
+        sur chaque image : une image non reconnue remet la fenêtre à zéro."""
+        rc, lc, k = self.cfg.recognition, self.cfg.liveness, self.cfg.auth.window_frames
+        use_live = lc.enabled and self.liveness is not None
         start = time.monotonic()
         result = AuthResult(Status.NO_FACE)
         if templates.size == 0:
             result.status = Status.NOT_ENROLLED
             return result
-        streak = 0
-        matched_but_spoof = 0
-        for frame in frames:
-            result.frames += 1
-            face = largest(self.detector.detect(frame))
-            if face is None or not self._quality(frame, face).ok:
-                streak = 0
-                continue
-            sim = best_similarity(self.recognizer.embed(frame, face), templates)
-            result.best_similarity = max(result.best_similarity, sim)
-            if sim < rc.threshold:
-                streak = 0
-                if result.status is Status.NO_FACE:
-                    result.status = Status.NO_MATCH
-                continue
-            if lc.enabled and self.liveness is not None:
-                live = self.liveness.score(frame, face)
-                result.liveness_scores.append(live)
-                if live < lc.threshold:
-                    streak = 0
-                    matched_but_spoof += 1
-                    result.status = Status.SPOOF
+        window: deque[float] = deque(maxlen=k)
+        seen_match = full_window_spoof = False
+        pool = ThreadPoolExecutor(max_workers=1) if use_live else None
+        try:
+            for frame in frames:
+                result.frames += 1
+                face = largest(self.detector.detect(frame))
+                if face is None or not self._quality(frame, face).ok:
+                    window.clear()
                     continue
-            streak += 1
-            if streak >= rc.required_frames:
-                result.status = Status.SUCCESS
-                break
-        if result.status is not Status.SUCCESS and matched_but_spoof == 0 and result.best_similarity >= rc.threshold:
-            # Le bon visage a été vu, mais pas assez longtemps de suite.
-            result.status = Status.NO_MATCH
+                sim, live = self._analyze(frame, face, templates, pool)
+                result.best_similarity = max(result.best_similarity, sim)
+                if sim < rc.threshold:
+                    window.clear()
+                    continue
+                seen_match = True
+                if use_live:
+                    result.liveness_scores.append(live)
+                window.append(live)
+                if len(window) < k:
+                    continue
+                mean = float(np.mean(window)) if use_live else float("inf")
+                result.window_liveness = max(result.window_liveness, mean)
+                if mean >= lc.threshold:
+                    result.status = Status.SUCCESS
+                    break
+                full_window_spoof = True
+        finally:
+            if pool is not None:
+                pool.shutdown(wait=True)
+        if result.status is not Status.SUCCESS:
+            if full_window_spoof:
+                result.status = Status.SPOOF
+            elif seen_match:
+                result.status = Status.TIMEOUT
+            elif result.best_similarity > -1.0:
+                result.status = Status.NO_MATCH
         result.elapsed_s = time.monotonic() - start
         return result
 
@@ -119,6 +146,7 @@ class Engine:
         obtenir des gabarits variés (légers changements d'angle et d'expression)."""
         ec, lc = self.cfg.enroll, self.cfg.liveness
         kept: list[np.ndarray] = []
+        lives: list[float] = []
         last_msg = ""
 
         def say(msg: str) -> None:
@@ -137,9 +165,6 @@ class Engine:
             if not q.ok:
                 say(q.reason)
                 continue
-            if lc.enabled and self.liveness is not None and self.liveness.score(frame, face) < lc.threshold:
-                say("visage jugé non vivant : améliorez l'éclairage, sans contre-jour")
-                continue
             emb = self.recognizer.embed(frame, face)
             if kept:
                 ref = np.stack(kept)
@@ -151,7 +176,13 @@ class Engine:
                     say("bougez légèrement la tête")
                     continue
             kept.append(emb)
+            if lc.enabled and self.liveness is not None:
+                lives.append(self.liveness.score(frame, face))
             say(f"capture {len(kept)}/{ec.samples}")
             if len(kept) >= ec.samples:
                 break
+        if lives and float(np.mean(lives)) < lc.threshold:
+            # Comme pour l'authentification, le vivant se juge sur l'ensemble.
+            say("visage jugé non vivant (photo, écran ?) : rien n'est enregistré")
+            return np.zeros((0, 128), np.float32)
         return np.stack(kept) if kept else np.zeros((0, 128), np.float32)

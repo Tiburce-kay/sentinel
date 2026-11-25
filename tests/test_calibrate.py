@@ -22,13 +22,15 @@ def test_etiquette_invalide():
         cal.record(engine(), [], T, "../x")
 
 
-def test_regle_des_fenetres_consecutives():
+def test_regle_de_la_moyenne_sur_fenetre():
     e = engine()
-    # vivant : 1 image sur 2 seulement au-dessus du seuil -> aucune fenêtre de 3 acceptée
-    rows = cal.record(e, [Scene(ME, live=1.0), Scene(ME, live=0.0)] * 10, T, "photo-ecran")
-    assert cal.window_accept_rate(rows, 0.5, 0.5, 3) == 0.0
-    rows = cal.record(e, [Scene(ME, live=1.0)] * 10, T, "reel")
-    assert cal.window_accept_rate(rows, 0.5, 0.5, 3) == 1.0
+    # moyenne 0,5 : acceptée au seuil 0, refusée au seuil 1
+    rows = cal.record(e, [Scene(ME, live=1.0), Scene(ME, live=0.0)] * 10, T, "reel")
+    assert cal.window_accept_rate(rows, 0.5, 0.0, 4) == 1.0
+    assert cal.window_accept_rate(rows, 0.5, 1.0, 4) == 0.0
+    # une image non reconnue invalide toutes les fenêtres qui la contiennent
+    rows = cal.record(e, [Scene(ME)] * 4 + [Scene(OTHER)] + [Scene(ME)] * 4, T, "reel")
+    assert cal.window_accept_rate(rows, 0.5, 0.0, 4) == 2 / 6
 
 
 def test_rapport():
@@ -36,4 +38,5 @@ def test_rapport():
     rows = cal.record(e, [Scene(ME, live=2.0)] * 10, T, "reel")
     rows += cal.record(e, [Scene(ME, live=-3.0)] * 10, T, "photo-ecran")
     text = cal.report(rows, 0.5, 0.5, 3)
-    assert "BPCER" in text and "photo-ecran" in text and "← actuel" in text
+    assert "BPCER" in text and "photo-ecran" in text and "← seuil actuel" in text
+    assert "pire -3.00" in text

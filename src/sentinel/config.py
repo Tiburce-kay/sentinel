@@ -39,15 +39,16 @@ class RecognitionConfig:
     # Similarité cosinus minimale (SFace). OpenCV propose 0,363 pour un usage
     # général ; Sentinel est plus strict par défaut.
     threshold: float = 0.50
-    # Nombre d'images concordantes exigées pour accepter.
-    required_frames: int = 3
 
 
 @dataclass
 class LivenessConfig:
     enabled: bool = True
-    # Écart minimal logit(réel) - logit(usurpation) pour juger une image « vivante ».
-    threshold: float = 0.5
+    # Seuil sur la MOYENNE, sur la fenêtre d'images, de l'écart
+    # logit(réel) - logit(usurpation). Image par image, le score est trop bruité
+    # sur une webcam ordinaire ; la moyenne sépare nettement vrai visage et attaque.
+    # Valeur calibrée sur le matériel réel : voir docs/CALIBRATION.md.
+    threshold: float = -1.0
     # Facteur d'agrandissement du cadre du visage (identique à l'entraînement du modèle).
     bbox_expansion: float = 1.5
 
@@ -64,6 +65,9 @@ class QualityConfig:
 @dataclass
 class AuthConfig:
     timeout_s: float = 4.0
+    # Nombre d'images consécutives exigées : visage de qualité et reconnu sur
+    # CHACUNE, et moyenne du score de vivant au-dessus du seuil.
+    window_frames: int = 10
     # Après ce nombre d'échecs consécutifs, le visage est refusé jusqu'à la
     # prochaine authentification par mot de passe.
     max_failures: int = 5

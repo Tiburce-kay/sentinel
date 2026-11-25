@@ -37,7 +37,7 @@ class FakeRecognizer:
     def embed(self, s, f):
         # Petite variation d'une image à l'autre, comme en vrai.
         self.i += 1
-        v = s.who + np.random.default_rng(self.i).normal(scale=0.03, size=128).astype(np.float32)
+        v = s.who + np.random.default_rng(1000 + self.i).normal(scale=0.03, size=128).astype(np.float32)
         return v / np.linalg.norm(v)
 
 
@@ -58,9 +58,12 @@ def engine(**over):
 T = np.stack([ME])
 
 
+K = 10  # fenêtre par défaut
+
+
 def test_bon_visage_vivant_accepte():
-    r = engine().authenticate([Scene(ME)] * 5, T)
-    assert r.status is Status.SUCCESS and r.frames == 3
+    r = engine().authenticate([Scene(ME)] * 15, T)
+    assert r.status is Status.SUCCESS and r.frames == K
 
 
 def test_autre_personne_refusee():
@@ -73,10 +76,26 @@ def test_photo_du_bon_visage_refusee():
     assert r.status is Status.SPOOF
 
 
-def test_succes_isoles_non_cumulables():
-    """Alterner vrai visage et photo ne doit jamais atteindre 3 images consécutives."""
-    seq = [Scene(ME), Scene(ME), Scene(ME, live=-3.0)] * 10
+def test_vrai_visage_bruite_accepte():
+    """Cas réel mesuré : le score d'un vrai visage oscille fortement (de -3 à +3)."""
+    seq = [Scene(ME, live=v) for v in [2.5, -3.0, 0.5, 3.0, -2.0, 1.0, 0.0, -1.5, 2.0, 0.5] * 3]
+    assert engine().authenticate(seq, T).ok
+
+
+def test_photo_avec_images_isolees_vivantes_refusee():
+    """Cas réel mesuré : une photo produit parfois une image isolée au-dessus de +1."""
+    seq = [Scene(ME, live=v) for v in [-6.0, -7.0, 1.1, -5.0, -6.5, -4.0, -8.0, 0.4, -6.0, -5.5] * 5]
+    r = engine().authenticate(seq, T)
+    assert r.status is Status.SPOOF and r.window_liveness < -1.0
+
+
+def test_une_image_non_reconnue_remet_la_fenetre_a_zero():
+    seq = ([Scene(ME)] * 9 + [Scene(OTHER)]) * 3
     assert engine().authenticate(seq, T).status is not Status.SUCCESS
+
+
+def test_delai_ecoule_avant_fenetre_complete():
+    assert engine().authenticate([Scene(ME)] * (K - 1), T).status is Status.TIMEOUT
 
 
 def test_aucun_visage():
@@ -84,12 +103,12 @@ def test_aucun_visage():
 
 
 def test_non_enrole():
-    r = engine().authenticate([Scene(ME)] * 5, np.zeros((0, 128), np.float32))
+    r = engine().authenticate([Scene(ME)] * 15, np.zeros((0, 128), np.float32))
     assert r.status is Status.NOT_ENROLLED
 
 
 def test_vivant_desactive_accepte_la_photo():
-    r = engine(liveness__enabled=False).authenticate([Scene(ME, live=-3.0)] * 5, T)
+    r = engine(liveness__enabled=False).authenticate([Scene(ME, live=-3.0)] * 15, T)
     assert r.ok
 
 
@@ -114,10 +133,16 @@ def test_enrolement_collecte_des_empreintes_variees():
 
 def test_enrolement_refuse_plusieurs_visages_et_photo():
     msgs = []
-    out = engine().enroll([Scene(ME, faces=2)] * 5 + [Scene(ME, live=-3.0)] * 5, msgs.append)
-    assert len(out) == 0
-    assert any("plusieurs visages" in m for m in msgs)
-    assert any("non vivant" in m for m in msgs)
+    out = engine().enroll([Scene(ME, faces=2)] * 5, msgs.append)
+    assert len(out) == 0 and any("plusieurs visages" in m for m in msgs)
+    rng = np.random.default_rng(0)
+    photo = []
+    for _ in range(100):
+        v = ME + rng.normal(scale=0.04, size=128).astype(np.float32)
+        photo.append(Scene(v / np.linalg.norm(v), live=-6.0))
+    msgs.clear()
+    out = engine().enroll(photo, msgs.append)
+    assert len(out) == 0 and any("non vivant" in m for m in msgs)
 
 
 def test_enrolement_refuse_un_changement_de_personne():

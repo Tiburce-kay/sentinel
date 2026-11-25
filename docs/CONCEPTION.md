@@ -45,16 +45,17 @@ exigences :
 
 ### Décision d'authentification
 
-Une image compte comme « bonne » si, à la fois :
+Une image est « utilisable » si un visage de qualité suffisante est détecté (taille,
+netteté, éclairage, inclinaison) **et** reconnu (similarité cosinus ≥ 0,50 avec un
+gabarit enrôlé).
 
-- un visage de qualité suffisante est détecté (taille, netteté, éclairage, inclinaison) ;
-- sa similarité cosinus avec un gabarit enrôlé dépasse le seuil (0,50 par défaut) ;
-- le modèle de texture le juge vivant.
-
-L'accès est accordé après **3 bonnes images consécutives**. Une seule image douteuse
-remet le compteur à zéro : un attaquant ne peut pas cumuler des succès isolés en
-alternant vrai visage et support truqué. Sans succès avant le délai (4 s), PAM passe
-la main au mot de passe.
+L'accès est accordé quand **10 images consécutives** sont utilisables **et** que la
+**moyenne** de leurs scores de vivant atteint le seuil (−1,0). Une seule image non
+reconnue remet la fenêtre à zéro. La moyenne, plutôt qu'un seuil image par image, est
+un choix issu des mesures : le score d'un vrai visage est trop bruité sur une webcam
+ordinaire, alors que la moyenne sépare nettement vrai visage et attaque (détail dans
+[`CALIBRATION.md`](CALIBRATION.md)). Sans succès avant le délai (4 s), PAM passe la
+main au mot de passe.
 
 ### Modèles d'IA
 
@@ -120,7 +121,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | Phase | Contenu | État |
 |---|---|---|
 | 1 | Conception, modèle de menaces | ✔ |
-| 2 | Moteur : caméra, détection, empreinte, vivant (texture), stockage chiffré, CLI | ✔ (à valider en direct) |
+| 2 | Moteur : caméra, détection, empreinte, vivant (texture), stockage chiffré, CLI, calibration | ✔ (calibré sur le T570) |
 | 2b | Défi aléatoire actif ; reflet d'une séquence de couleurs de l'écran | à faire |
 | 3 | Service `sentineld` isolé + module `pam_sentinel.so` ; `sudo` | à faire |
 | 4 | Écran de verrouillage, GDM, verrouillage automatique en cas d'absence | à faire |

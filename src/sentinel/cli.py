@@ -124,7 +124,9 @@ def cmd_test(cfg: Config, args) -> int:
     print(f"Résultat : {res.status.value}")
     print(f"  similarité max {res.best_similarity:.3f} (seuil {cfg.recognition.threshold})")
     if lv:
-        print(f"  vivant : min {min(lv):.2f} / max {max(lv):.2f} (seuil {cfg.liveness.threshold})")
+        win = f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "fenêtre incomplète"
+        print(f"  vivant : moyenne sur {cfg.auth.window_frames} images {win} (seuil {cfg.liveness.threshold:+.2f});"
+              f" image par image de {min(lv):+.2f} à {max(lv):+.2f}")
     print(f"  {res.frames} images en {res.elapsed_s:.2f} s")
     return 0 if res.ok else 1
 
@@ -138,7 +140,7 @@ def cmd_calibrate(cfg: Config, args) -> int:
             print("Aucune mesure : lancer d'abord « sentinel calibrate reel ».")
             return 1
         print(cal.report(cal.load(csv_path), cfg.recognition.threshold,
-                         cfg.liveness.threshold, cfg.recognition.required_frames))
+                         cfg.liveness.threshold, cfg.auth.window_frames))
         return 0
     if not args.label:
         print("Préciser une étiquette (reel, autre, photo-ecran, photo-papier, video…) ou --report.")
