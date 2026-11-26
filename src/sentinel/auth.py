@@ -106,7 +106,7 @@ class Engine:
         sign = 1.0 if direction == "gauche" else -1.0
         ref = Pose.of(ref_pts)
         deadline = time.monotonic() + a.challenge_timeout_s
-        good = 0
+        good = wrong = 0
         for frame in frames:
             if should_abort is not None and should_abort():
                 return Status.SKIPPED
@@ -117,8 +117,16 @@ class Engine:
                 continue
             pts = landmarks(face.raw)
             dy = (Pose.of(pts).yaw - ref.yaw) * sign
-            if dy < -ec.yaw_delta:
-                return Status.CHALLENGE_FAILED  # tourné dans le mauvais sens
+            # Mauvais sens : seulement s'il est net (1,5 fois l'angle demandé) et confirmé
+            # sur deux images d'affilée. Un petit mouvement réflexe au moment où la
+            # consigne s'affiche ne fait pas échouer (essai réel du 26/11), mais une
+            # vidéo qui tourne de l'autre côté est toujours arrêtée.
+            if dy < -1.5 * ec.yaw_delta:
+                wrong += 1
+                if wrong >= 2:
+                    return Status.CHALLENGE_FAILED
+                continue
+            wrong = 0
             if dy < ec.yaw_delta:
                 continue
             if best_similarity(self.recognizer.embed(frame, face), templates) < self.cfg.recognition.threshold:

@@ -300,3 +300,11 @@ def test_zone_grise_photo_toujours_refusee():
 def test_bien_sous_la_zone_grise_reste_une_usurpation():
     r = challenge_engine().authenticate([Shot(ME, -6.0)] * 40, T1, on_challenge=lambda m: None)
     assert r.status.name == "SPOOF" and r.challenge == ""
+
+
+def test_defi_mouvement_reflexe_dans_l_autre_sens_tolere():
+    """Cas réel : léger mouvement à gauche au moment de la consigne « droite »."""
+    seq = ([Shot(ME, -0.5)] * 10 + [Shot(ME, -0.5, yaw_deg=25)]   # une image, mauvais sens
+           + [Shot(ME, -0.5)] * 2 + [Shot(ME, -0.5, yaw_deg=-25)] * 4)
+    r = challenge_engine("droite").authenticate(seq, T1, on_challenge=lambda m: None)
+    assert r.ok
