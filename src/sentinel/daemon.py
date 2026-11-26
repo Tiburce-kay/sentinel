@@ -74,6 +74,7 @@ class State:
         self.camera_lock = threading.Lock()
         self.lock = threading.Lock()
         self.last_password: dict[str, float] = {}
+        self.skip_requests: dict[str, float] = {}
         self.password_failures: dict[str, list[float]] = {}
 
     def get_engine(self) -> Engine:
@@ -90,12 +91,34 @@ class State:
 
     # --- Politique de mot de passe ----------------------------------------------
 
-    def password_required(self, user: str) -> bool:
+    def password_required(self, user: str, enr: Enrollment | None = None) -> bool:
         a = self.cfg.auth
         if not a.require_password_after_boot:
             return False
+        # L'utilisateur a choisi le visage dès le démarrage (comme Windows Hello) :
+        # pas de mot de passe obligatoire après le démarrage. Le verrouillage après
+        # plusieurs échecs, lui, s'applique toujours.
+        if enr is not None and enr.uses.get("login"):
+            return False
         last = self.last_password.get(user)
         return last is None or time.monotonic() - last > a.password_every_h * 3600
+
+    SKIP_VALIDITY_S = 10.0
+
+    def request_skip(self, user: str) -> None:
+        with self.lock:
+            self.skip_requests[user] = time.monotonic()
+
+    def skip_pending(self, user: str) -> bool:
+        """Une demande « passer au mot de passe » récente (clic juste avant ou pendant
+        la vérification) ?"""
+        with self.lock:
+            t = self.skip_requests.get(user)
+        return t is not None and time.monotonic() - t < self.SKIP_VALIDITY_S
+
+    def consume_skip(self, user: str) -> None:
+        with self.lock:
+            self.skip_requests.pop(user, None)
 
     def mark_password(self, user: str) -> None:
         with self.lock:
@@ -204,8 +227,20 @@ class Handler(socketserver.StreamRequestHandler):
         if not self.peer.is_root:
             raise Refused("forbidden", "réservé à root")
         user = validate_username(req.get("user", ""))
-        self.state.mark_password(user)
+        st = self.state
+        st.mark_password(user)
         log.info("mot de passe validé user=%s (verrou levé)", user)
+        authtok = req.get("authtok")
+        if isinstance(authtok, str) and authtok:
+            enr = st.store.load(user)
+            # Mis à jour seulement si l'utilisateur a choisi le visage au démarrage, et
+            # après une vérification indépendante (PAM) : un appelant root qui se
+            # tromperait ne peut pas enregistrer un mauvais mot de passe.
+            if enr is not None and enr.uses.get("login") and st.store.load_secret(user) != authtok:
+                from .pamauth import check_password
+                if check_password(user, authtok):
+                    st.store.save_secret(user, authtok)
+                    log.info("mot de passe du trousseau mis à jour user=%s", user)
         self.send({"ok": True})
 
     def op_authenticate(self, req: dict) -> None:
@@ -224,7 +259,7 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("not_enrolled", Status.NOT_ENROLLED.value)
         if use != "test" and not enr.uses.get(use, False):
             raise Refused("disabled", "visage non activé pour cet usage")
-        if use != "test" and st.password_required(user):
+        if use != "test" and st.password_required(user, enr):
             raise Refused("password_required", "mot de passe requis (premier déverrouillage)")
         if st.store.failures(user) >= cfg.auth.max_failures:
             raise Refused("locked", Status.LOCKED.value)
@@ -239,17 +274,33 @@ class Handler(socketserver.StreamRequestHandler):
                 if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
                     raise Refused("camera", "caméra différente de celle de l'enrôlement")
                 res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings,
-                                                   enr.liveness_threshold, enr.stats.get("reference_pose"))
+                                                   enr.liveness_threshold, enr.stats.get("reference_pose"),
+                                                   should_abort=lambda: st.skip_pending(user))
         finally:
             st.camera_lock.release()
+            st.consume_skip(user)
         if res.ok:
             st.store.set_failures(user, 0)
         elif res.status in (Status.SPOOF, Status.NO_MATCH):
             st.store.set_failures(user, st.store.failures(user) + 1)
         log.info("authentification user=%s service=%s résultat=%s durée=%.2fs",
                  user, service, res.status.name, res.elapsed_s)
-        self.send({"ok": res.ok, "status": res.status.name.lower(), "message": res.status.value,
-                   "elapsed": round(res.elapsed_s, 2)})
+        reply = {"ok": res.ok, "status": res.status.name.lower(), "message": res.status.value,
+                 "elapsed": round(res.elapsed_s, 2)}
+        if res.ok and self.peer.is_root and use == "login" and enr.uses.get("login"):
+            # Connexion par le visage : le mot de passe, s'il est conservé, est rendu au
+            # module PAM pour ouvrir le trousseau. Jamais journalisé.
+            secret = st.store.load_secret(user)
+            if secret is not None:
+                reply["authtok"] = secret
+        self.send(reply)
+
+    def op_skip(self, req: dict) -> None:
+        """« Passer au mot de passe » (bouton clé de l'écran de verrouillage)."""
+        user = self._user(req)
+        self._require_local()
+        self.state.request_skip(user)
+        self.send({"ok": True})
 
     # --- Enrôlement (interface graphique) --------------------------------------
 
@@ -345,12 +396,21 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("bad_password", "mot de passe incorrect")
         uses = req.get("uses") or {}
         out = self.pending["outcome"]
-        st.store.save(Enrollment(user=user, embeddings=out.embeddings, camera=self.pending["camera"],
-                                 liveness_threshold=out.liveness_threshold, stats=out.stats,
-                                 uses={k: bool(uses.get(k, v)) for k, v in DEFAULT_USES.items()}))
+        enr = Enrollment(user=user, embeddings=out.embeddings, camera=self.pending["camera"],
+                         liveness_threshold=out.liveness_threshold, stats=out.stats,
+                         uses={k: bool(uses.get(k, v)) for k, v in DEFAULT_USES.items()})
+        st.store.save(enr)
+        self._sync_secret(enr, str(req.get("password", "")))
         self.pending = None
         log.info("enrôlement enregistré user=%s", user)
         self.send({"ok": True, "message": "Visage enregistré"})
+
+    def _sync_secret(self, enr: Enrollment, password: str) -> None:
+        """Mot de passe conservé seulement si « connexion au démarrage » est activé."""
+        if enr.uses.get("login") and password:
+            self.state.store.save_secret(enr.user, password)
+        elif not enr.uses.get("login"):
+            self.state.store.remove_secret(enr.user)
 
     def op_set_uses(self, req: dict) -> None:
         user = self._user(req)
@@ -363,6 +423,7 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("not_enrolled", Status.NOT_ENROLLED.value)
         enr.uses = {k: bool((req.get("uses") or {}).get(k, v)) for k, v in enr.uses.items()}
         st.store.save(enr)
+        self._sync_secret(enr, str(req.get("password", "")))
         self.send({"ok": True, "uses": enr.uses})
 
     def op_remove(self, req: dict) -> None:

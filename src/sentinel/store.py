@@ -203,7 +203,48 @@ class TemplateStore:
                           stats=data.get("stats", {}),
                           created=data["created"], updated=data["updated"])
 
+    # --- Mot de passe pour le trousseau (option « connexion au démarrage ») -----
+    #
+    # Le trousseau GNOME est chiffré avec le mot de passe de connexion : après une
+    # connexion par le visage, il resterait verrouillé. Si l'utilisateur l'a choisi,
+    # son mot de passe est conservé ici, chiffré (AES-256-GCM, lié à son compte), et
+    # n'est rendu qu'au module PAM, après une connexion réussie par le visage.
+    # Limite : un attaquant déjà root peut le déchiffrer (clé sur le disque).
+
+    def _secret_path(self, user: str) -> Path:
+        return self.users_dir / f"{validate_username(user)}.authtok"
+
+    def save_secret(self, user: str, secret: str) -> None:
+        self.check_permissions()
+        nonce = secrets.token_bytes(12)
+        aad = f"sentinel-authtok-v1|{user}".encode()
+        ct = AESGCM(self._key()).encrypt(nonce, secret.encode(), aad)
+        doc = {"format": "sentinel-authtok", "version": 1, "user": user,
+               "nonce": _b64(nonce), "ciphertext": _b64(ct)}
+        _write_atomic(self._secret_path(user), json.dumps(doc).encode())
+
+    def load_secret(self, user: str) -> str | None:
+        path = self._secret_path(user)
+        if not path.exists():
+            return None
+        self._check(path, is_dir=False)
+        try:
+            doc = json.loads(_read_nofollow(path))
+            if doc.get("user") != user:
+                raise TamperedError(f"{path} : secret d'un autre utilisateur")
+            return AESGCM(self._key()).decrypt(
+                _unb64(doc["nonce"]), _unb64(doc["ciphertext"]),
+                f"sentinel-authtok-v1|{user}".encode()).decode()
+        except InvalidTag:
+            raise TamperedError(f"{path} : secret modifié ou déplacé : refusé") from None
+        except (ValueError, KeyError, TypeError) as exc:
+            raise TamperedError(f"{path} : illisible ({exc})") from None
+
+    def remove_secret(self, user: str) -> None:
+        self._secret_path(user).unlink(missing_ok=True)
+
     def remove(self, user: str) -> bool:
+        self.remove_secret(user)
         path = self._path(user)
         state = self.state_dir / f"{validate_username(user)}.json"
         state.unlink(missing_ok=True)

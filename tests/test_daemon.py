@@ -182,3 +182,76 @@ def test_suppression_avec_mot_de_passe(service):
         assert c.call("remove", password="faux")["status"] == "bad_password"
         assert c.call("remove", password=PASSWORD)["removed"]
         assert not c.call("status")["enrolled"]
+
+
+# --- Visage au démarrage, trousseau, bouton clé -----------------------------------
+
+def as_root(service_state, monkeypatch):
+    monkeypatch.setattr(d, "peer_of", lambda sock: FakePeer(os.getpid(), 0, 0))
+
+
+def test_demarrage_par_le_visage_rend_le_mot_de_passe_au_seul_module_root(service, monkeypatch):
+    enroll(service, uses={"login": True})
+    assert service.store.load_secret("alice") == PASSWORD
+    service.cfg.auth.require_password_after_boot = True
+    service.last_password.clear()
+    monkeypatch.setattr(d, "user_has_session", lambda uid: False)  # pas de session : connexion
+    service.scenes = [Shot(ME, 1.0)] * 20
+    with service.client() as c:  # appelant ordinaire : jamais de mot de passe
+        r = c.call("authenticate", service="gdm-password")
+        assert r["ok"] and "authtok" not in r
+    as_root(service, monkeypatch)
+    with service.client() as c:
+        r = c.call("authenticate", user="alice", service="gdm-password")
+        assert r["ok"] and r["authtok"] == PASSWORD
+        r = c.call("authenticate", user="alice", service="sudo")
+        assert r["ok"] and "authtok" not in r  # uniquement pour ouvrir une session
+
+
+def test_sans_option_demarrage_le_mot_de_passe_reste_exige_et_rien_n_est_stocke(service, monkeypatch):
+    enroll(service)
+    assert service.store.load_secret("alice") is None
+    service.cfg.auth.require_password_after_boot = True
+    service.last_password.clear()
+    with service.client() as c:
+        assert c.call("authenticate", service="sudo")["status"] == "password_required"
+
+
+def test_photo_au_demarrage_ne_rend_rien(service, monkeypatch):
+    enroll(service, uses={"login": True})
+    monkeypatch.setattr(d, "user_has_session", lambda uid: False)
+    as_root(service, monkeypatch)
+    service.scenes = [Shot(ME, -6.0)] * 20
+    with service.client() as c:
+        r = c.call("authenticate", user="alice", service="gdm-password")
+    assert not r["ok"] and "authtok" not in r
+
+
+def test_bouton_cle_interrompt_la_verification(service):
+    enroll(service)
+    service.scenes = [Shot(ME, 1.0)] * 20
+    with service.client() as c:
+        assert c.call("skip")["ok"]
+        r = c.call("authenticate", service="sudo")
+        assert r["status"] == "skipped"
+        # La demande est consommée : la tentative suivante utilise de nouveau le visage.
+        assert c.call("authenticate", service="sudo")["ok"]
+
+
+def test_mot_de_passe_change_mis_a_jour_apres_verification(service, monkeypatch):
+    import sentinel.pamauth
+    enroll(service, uses={"login": True})
+    as_root(service, monkeypatch)
+    monkeypatch.setattr(sentinel.pamauth, "check_password", lambda u, p: p == "Nouveau-77")
+    with service.client() as c:
+        c.call("password_ok", user="alice", authtok="Faux")
+        assert service.store.load_secret("alice") == PASSWORD  # refusé par PAM
+        c.call("password_ok", user="alice", authtok="Nouveau-77")
+    assert service.store.load_secret("alice") == "Nouveau-77"
+
+
+def test_desactiver_le_demarrage_efface_le_mot_de_passe(service):
+    enroll(service, uses={"login": True})
+    with service.client() as c:
+        r = c.call("set_uses", password=PASSWORD, uses={"login": False})
+    assert r["ok"] and service.store.load_secret("alice") is None

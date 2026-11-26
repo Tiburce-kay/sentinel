@@ -129,3 +129,20 @@ def test_suppression(store):
 def test_gabarits_invalides_refuses(store):
     with pytest.raises(StoreError):
         store.save(Enrollment("alice", np.zeros((2, 64), np.float32)))
+
+
+def test_secret_trousseau_chiffre_et_lie_au_compte(store):
+    store.save_secret("alice", "Mot-de-passe-42")
+    raw = (store.users_dir / "alice.authtok").read_bytes()
+    assert b"Mot-de-passe-42" not in raw
+    assert store.load_secret("alice") == "Mot-de-passe-42"
+    plant(store.users_dir / "bob.authtok", raw)  # déplacé vers un autre compte
+    with pytest.raises(TamperedError):
+        store.load_secret("bob")
+
+
+def test_suppression_du_visage_efface_le_secret(store):
+    store.save(Enrollment("alice", emb()))
+    store.save_secret("alice", "x")
+    store.remove("alice")
+    assert store.load_secret("alice") is None
