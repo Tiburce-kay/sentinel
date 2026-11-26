@@ -115,6 +115,11 @@ class AuthConfig:
 
 
 @dataclass
+class PresenceConfig:
+    duration_s: float = 0.8   # durée d'une vérification de présence (caméra allumée)
+
+
+@dataclass
 class EnrollConfig:
     per_pose: int = 2               # empreintes retenues par pose (5 poses)
     timeout_s: float = 60.0
@@ -137,6 +142,7 @@ class Config:
     quality: QualityConfig = field(default_factory=QualityConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
     enroll: EnrollConfig = field(default_factory=EnrollConfig)
+    presence: PresenceConfig = field(default_factory=PresenceConfig)
 
 
 def _apply(obj, values: dict, where: str) -> None:

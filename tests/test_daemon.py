@@ -285,3 +285,41 @@ def test_demande_de_mot_de_passe_refusee_a_distance(service):
     service.local = False
     with service.client() as c:
         assert c.call("skip", user="alice")["status"] == "forbidden"
+
+
+# --- Protection en votre absence -------------------------------------------------
+
+def test_presence_desactivee_par_defaut(service):
+    enroll(service)
+    with service.client() as c:
+        assert c.call("presence")["status"] == "disabled"
+
+
+def test_presence_utilisateur_present_puis_absent(service):
+    enroll(service, uses={"autolock": True})
+    service.scenes = [Shot(ME, 1.0)] * 5
+    with service.client() as c:
+        r = c.call("presence")
+        assert r["ok"] and r["owner"] and r["strangers"] == 0
+        service.scenes = [Shot(None, 1.0)] * 5
+        r = c.call("presence")
+        assert r["ok"] and not r["owner"] and r["faces"] == 0
+
+
+def test_presence_reservee_a_soi_et_en_local(service):
+    enroll(service, uses={"watch": True})
+    with service.client() as c:
+        assert c.call("presence", user="bob")["status"] == "forbidden"
+    service.local = False
+    with service.client() as c:
+        assert c.call("presence")["status"] == "forbidden"
+
+
+def test_nouvelles_options_activables_sur_un_ancien_enrolement(service):
+    enroll(service)
+    enr = service.store.load("alice")
+    enr.uses = {"sudo": True, "lockscreen": True, "login": False}  # enrôlement d'avant
+    service.store.save(enr)
+    with service.client() as c:
+        r = c.call("set_uses", password=PASSWORD, uses={"autolock": True})
+    assert r["ok"] and r["uses"]["autolock"] is True and r["uses"]["watch"] is False

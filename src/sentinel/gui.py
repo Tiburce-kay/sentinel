@@ -93,7 +93,8 @@ class DemoBackend:
         return {"ok": True, "user": "demo"}
 
     def status(self) -> dict:
-        return {"ok": True, "enrolled": False, "uses": {"sudo": True, "lockscreen": True, "login": False}}
+        return {"ok": True, "enrolled": False,
+                "uses": {"sudo": True, "lockscreen": True, "login": False, "autolock": False, "watch": False}}
 
     def enroll(self):
         n = 40
@@ -336,7 +337,7 @@ def check_row(text: str) -> Gtk.Box:
 
 class Wizard(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, backend_factory, snapshot_dir: Path | None = None):
-        super().__init__(application=app, title="Sentinel", default_width=540, default_height=700)
+        super().__init__(application=app, title="Sentinel", default_width=560, default_height=800)
         self.backend_factory = backend_factory
         self.backend = None
         self.snapshot_dir = snapshot_dir
@@ -455,6 +456,17 @@ class Wizard(Adw.ApplicationWindow):
         for row in (self.use_sudo, self.use_lock, self.use_login):
             uses.add(row.row)
         box.append(uses)
+        away = Adw.PreferencesGroup(
+            title="Protection en votre absence",
+            description="La caméra s'allume brièvement pour vérifier qui est devant l'écran. "
+                        "Aucune image n'est conservée.")
+        self.use_autolock = SwitchRow("Verrouiller quand je m'éloigne",
+                                      "Si le PC est inactif et que vous n'êtes plus devant l'écran.")
+        self.use_watch = SwitchRow("M'alerter si quelqu'un regarde mon écran",
+                                   "Notification si un autre visage apparaît derrière le vôtre.")
+        for row in (self.use_autolock, self.use_watch):
+            away.add(row.row)
+        box.append(away)
         self.confirm_group = confirm = Adw.PreferencesGroup(
             title="Confirmation",
             description="Saisissez votre mot de passe pour autoriser l'enregistrement de votre visage.")
@@ -541,6 +553,8 @@ class Wizard(Adw.ApplicationWindow):
             self.use_sudo.set_active(uses.get("sudo", True))
             self.use_lock.set_active(uses.get("lockscreen", True))
             self.use_login.set_active(uses.get("login", False))
+            self.use_autolock.set_active(uses.get("autolock", False))
+            self.use_watch.set_active(uses.get("watch", False))
         in_thread(work, done)
 
     def _start_capture(self) -> None:
@@ -620,7 +634,8 @@ class Wizard(Adw.ApplicationWindow):
     def _commit(self) -> None:
         password = self.password.get_text()
         uses = {"sudo": self.use_sudo.get_active(), "lockscreen": self.use_lock.get_active(),
-                "login": self.use_login.get_active()}
+                "login": self.use_login.get_active(), "autolock": self.use_autolock.get_active(),
+                "watch": self.use_watch.get_active()}
         self.finish_button.set_sensitive(False)
         self.confirm_error.set_label("")
 
@@ -632,7 +647,8 @@ class Wizard(Adw.ApplicationWindow):
             elif result.get("ok"):
                 if isinstance(self.backend, ServiceBackend):
                     try:
-                        enable_lockscreen_button(uses["lockscreen"])
+                        # L'extension sert au bouton clé ET à la protection en votre absence.
+                        enable_lockscreen_button(uses["lockscreen"] or uses["autolock"] or uses["watch"])
                     except Exception:  # noqa: BLE001 — confort, jamais bloquant
                         pass
                 self._show("done")

@@ -32,7 +32,10 @@ FORMAT = "sentinel-template"
 VERSION = 1
 USERNAME_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}\$?")
 MAX_TEMPLATES = 64
-DEFAULT_USES = {"sudo": True, "lockscreen": True, "login": False}
+DEFAULT_USES = {"sudo": True, "lockscreen": True, "login": False,
+                # Protection en votre absence (désactivées par défaut) :
+                "autolock": False,   # verrouiller quand l'utilisateur n'est plus devant le PC
+                "watch": False}      # alerter si quelqu'un d'autre regarde l'écran
 
 
 class StoreError(Exception):
