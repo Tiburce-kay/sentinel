@@ -51,13 +51,32 @@ function requestSkip(userName) {
     });
 }
 
-function showEntry(prompt) {
+function cancelSafety(prompt) {
     if (prompt._sentinelSafety) {
         GLib.source_remove(prompt._sentinelSafety);
         prompt._sentinelSafety = 0;
     }
+}
+
+function showEntry(prompt) {
+    cancelSafety(prompt);
+    if (prompt._sentinelDestroyed)
+        return;
     prompt._sentinelKeyButton?.hide();
     prompt._entry?.show();
+}
+
+function watchDestroy(prompt) {
+    // L'invite disparaît (session ouverte, écran déverrouillé) : plus rien à faire,
+    // et surtout ne plus toucher à ses éléments, déjà détruits.
+    if (prompt._sentinelWatched)
+        return;
+    prompt._sentinelWatched = true;
+    prompt.connect('destroy', () => {
+        cancelSafety(prompt);
+        prompt._sentinelDestroyed = true;
+        prompt._sentinelKeyButton = null;
+    });
 }
 
 function keyButton(prompt) {
@@ -92,12 +111,14 @@ export default class SentinelExtension extends Extension {
             const result = original.call(this, params, ...rest);
             try {
                 this._sentinelUser = params?.userName ?? null;
+                watchDestroy(this);
                 if (sentinelInstalled()) {
                     this._entry.hide();
-                    if (this._sentinelSafety)
-                        GLib.source_remove(this._sentinelSafety);
+                    cancelSafety(this);
                     this._sentinelSafety = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, SAFETY_DELAY_S, () => {
                         this._sentinelSafety = 0;
+                        if (this._sentinelDestroyed)
+                            return GLib.SOURCE_REMOVE;
                         try {
                             showEntry(this);
                         } catch (e) {
@@ -139,6 +160,16 @@ export default class SentinelExtension extends Extension {
                 this._entry?.show();
             }
             return result;
+        });
+
+        // Vérification terminée (succès) : plus besoin du filet de sécurité.
+        this._injections.overrideMethod(proto, 'finish', original => function (...args) {
+            try {
+                cancelSafety(this);
+            } catch (e) {
+                logError(e, 'Sentinel');
+            }
+            return original.call(this, ...args);
         });
 
         // Annulation / remise à zéro : état normal de GNOME.

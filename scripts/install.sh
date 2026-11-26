@@ -103,6 +103,10 @@ install -m 0644 "$REPO/packaging/gnome-shell-extension/$EXT/"* "/usr/share/gnome
 # GDM, via le mécanisme prévu par la distribution (fichiers compilés au démarrage de GDM).
 if [ -x /usr/share/gdm/generate-config ] && [ -d /usr/share/gdm/dconf ]; then
     install -m 0644 "$REPO/packaging/gdm-dconf-95-sentinel" /usr/share/gdm/dconf/95-sentinel
+    # Verrou : l'écran de connexion (GDM 49+) a sa propre base de réglages, qui
+    # primerait sinon sur ce fichier.
+    install -d -m 0755 /usr/share/gdm/dconf/locks
+    install -m 0644 "$REPO/packaging/gdm-dconf-locks-95-sentinel" /usr/share/gdm/dconf/locks/95-sentinel
     /usr/share/gdm/generate-config >/dev/null 2>&1 || true
     echo "extension activée pour l'écran de connexion (au prochain démarrage de GDM)"
 fi
