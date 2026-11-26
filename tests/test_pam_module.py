@@ -146,3 +146,83 @@ def test_reponse_falsifiee_sans_ok_refusee(built, tmp_path):
 def test_notification_mot_de_passe(built, tmp_path):
     out, reqs = run(built, tmp_path, [{"ok": True}], notify=True)
     assert reqs == [{"op": "password_ok", "user": "alice"}]
+
+
+# --- Disposition « trousseau » de l'écran de connexion, avec la vraie libpam ----------
+
+PAM_EXEC = Path("/usr/lib/x86_64-linux-gnu/security/pam_exec.so")
+
+
+def keyring_stack(built: Path, tmp: Path, replies, password_ok: bool):
+    """Pile identique à celle de gdm-password ; pam_exec remplace pam_gnome_keyring
+    pour observer le mot de passe qu'il recevrait."""
+    sock, conf, seen = tmp / "s.sock", tmp / "conf", tmp / "vu.txt"
+    conf.mkdir(exist_ok=True)
+    spy = tmp / "espion.sh"
+    spy.write_text(f"#!/bin/sh\ncat > {seen}\n")
+    spy.chmod(0o755)
+    (conf / "gdm-password").write_text(
+        f"auth [success=ok default=2] {built}/pam_sentinel.so socket={sock} timeout=3\n"
+        f"auth optional pam_exec.so expose_authtok quiet {spy}\n"
+        "auth [success=done default=die] pam_permit.so\n"
+        f"auth required {'pam_permit.so' if password_ok else 'pam_deny.so'}\n")
+    fake = FakeService(sock, replies)
+    try:
+        p = subprocess.run([str(built / "pam-harness"), str(conf), "gdm-password", "alice"],
+                           capture_output=True, text=True, timeout=15)
+    finally:
+        fake.close()
+        sock.unlink(missing_ok=True)
+    return p.stdout, (seen.read_text().rstrip("\0") if seen.exists() else None)
+
+
+needs_exec = pytest.mark.skipif(not PAM_EXEC.exists(), reason="pam_exec absent")
+
+
+@needs_exec
+def test_visage_au_demarrage_transmet_le_mot_de_passe_au_trousseau(built, tmp_path):
+    secret = 'Mdp "complexe" \\ é 42'
+    out, seen = keyring_stack(built, tmp_path, [{"event": "camera"},
+                              {"ok": True, "status": "success", "authtok": secret}], password_ok=False)
+    assert "Success" in out          # accepté sans passer par le mot de passe
+    assert seen == secret            # le trousseau aurait reçu le bon mot de passe
+
+
+@needs_exec
+def test_echec_du_visage_ne_fait_pas_echouer_un_bon_mot_de_passe(built, tmp_path):
+    out, seen = keyring_stack(built, tmp_path, [{"event": "camera"},
+                              {"ok": False, "status": "spoof", "message": "usurpation"}], password_ok=True)
+    assert "Success" in out and seen is None
+
+
+@needs_exec
+def test_echec_du_visage_et_mauvais_mot_de_passe(built, tmp_path):
+    out, _ = keyring_stack(built, tmp_path, [{"ok": False, "status": "no_face", "message": "x"}],
+                           password_ok=False)
+    assert "Success" not in out
+
+
+@needs_exec
+def test_visage_non_enregistre_mene_au_mot_de_passe(built, tmp_path):
+    out, seen = keyring_stack(built, tmp_path, [{"ok": False, "status": "not_enrolled"}], password_ok=True)
+    assert "Success" in out and seen is None
+
+
+def test_notify_transmet_le_mot_de_passe_echappe(built, tmp_path):
+    """Aller-retour complet : le mot de passe reçu par une ligne (visage) est renvoyé
+    intact par la ligne notify, même avec guillemets, barre oblique et caractère de contrôle."""
+    secret = 'a"b\\c\x01d é'
+    a, b, conf = tmp_path / "a.sock", tmp_path / "b.sock", tmp_path / "conf"
+    conf.mkdir()
+    (conf / "sudo").write_text(
+        f"auth optional {built}/pam_sentinel.so socket={a}\n"
+        f"auth optional {built}/pam_sentinel.so socket={b} notify\n")
+    face = FakeService(a, [{"ok": True, "status": "success", "authtok": secret}])
+    notify = FakeService(b, [{"ok": True}])
+    try:
+        subprocess.run([str(built / "pam-harness"), str(conf), "sudo", "alice"],
+                       capture_output=True, timeout=15)
+    finally:
+        face.close()
+        notify.close()
+    assert notify.requests == [{"op": "password_ok", "user": "alice", "authtok": secret}]

@@ -60,3 +60,30 @@ def test_fichier_reel_de_cette_machine():
     text = real.read_text()  # peut déjà contenir les lignes Sentinel
     assert disable(enable(text)).strip() == disable(text).strip()
     assert is_enabled(enable(text))
+
+
+DEBIAN_GDM = """#%PAM-1.0
+auth    requisite       pam_nologin.so
+auth\trequired\tpam_succeed_if.so user != root quiet_success
+@include common-auth
+auth    optional        pam_gnome_keyring.so
+@include common-account
+"""
+
+
+def test_disposition_trousseau_pour_l_ecran_de_connexion():
+    out = enable(DEBIAN_GDM, keyring=True).splitlines()
+    i = out.index("@include common-auth")
+    assert "[success=ok default=2]" in out[i - 3] and "pam_sentinel.so" in out[i - 3]
+    assert "pam_gnome_keyring.so" in out[i - 2]
+    assert "[success=done default=die]" in out[i - 1] and "pam_permit.so" in out[i - 1]
+    assert "notify" in out[i + 1]
+    # La vérification « pas root » reste AVANT le visage.
+    assert out.index("auth\trequired\tpam_succeed_if.so user != root quiet_success") < i - 3
+    assert disable("\n".join(out) + "\n") == DEBIAN_GDM
+
+
+def test_desactivation_d_une_ancienne_disposition_sufficient():
+    old = enable(DEBIAN_GDM, keyring=False)
+    assert disable(old) == DEBIAN_GDM
+    assert enable(disable(old), keyring=True) != old

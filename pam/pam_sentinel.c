@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
+#include <strings.h>
 #include <unistd.h>
 
 #define DEFAULT_SOCKET "/run/sentinel/sentinel.sock"
@@ -183,23 +184,81 @@ static int starts_with(const char *s, const char *prefix)
     return strncmp(s, prefix, strlen(prefix)) == 0;
 }
 
-/* Extrait la valeur texte d'une clé (réponses JSON du service, format connu). */
-static void json_string(const char *json, const char *key, char *out, size_t out_len)
+/* Extrait la valeur texte d'une clé (réponses JSON du service, format connu) en
+ * décodant les échappements JSON. Renvoie -1 si la valeur est absente, trop longue
+ * ou mal formée (dans ce cas `out` est vidé). */
+static int json_string(const char *json, const char *key, char *out, size_t out_len)
 {
     char pattern[32];
     snprintf(pattern, sizeof(pattern), "\"%s\": \"", key);
     out[0] = '\0';
     const char *p = strstr(json, pattern);
     if (!p)
-        return;
+        return -1;
     p += strlen(pattern);
     size_t i = 0;
-    while (*p && *p != '"' && i < out_len - 1) {
-        if (*p == '\\' && p[1])
-            p++;
-        out[i++] = *p++;
+    while (*p && *p != '"') {
+        unsigned char ch = (unsigned char)*p++;
+        if (ch == '\\') {
+            switch (*p++) {
+            case '"': ch = '"'; break;
+            case '\\': ch = '\\'; break;
+            case '/': ch = '/'; break;
+            case 'b': ch = '\b'; break;
+            case 'f': ch = '\f'; break;
+            case 'n': ch = '\n'; break;
+            case 'r': ch = '\r'; break;
+            case 't': ch = '\t'; break;
+            case 'u': {
+                unsigned v = 0;
+                for (int k = 0; k < 4; k++) {
+                    char h = *p++;
+                    v <<= 4;
+                    if (h >= '0' && h <= '9') v |= (unsigned)(h - '0');
+                    else if (h >= 'a' && h <= 'f') v |= (unsigned)(h - 'a' + 10);
+                    else if (h >= 'A' && h <= 'F') v |= (unsigned)(h - 'A' + 10);
+                    else goto bad;
+                }
+                if (v == 0 || v > 0x7f)  /* le service envoie l'UTF-8 brut : seuls les */
+                    goto bad;            /* caractères de contrôle arrivent en \\uXXXX   */
+                ch = (unsigned char)v;
+                break;
+            }
+            default: goto bad;
+            }
+        }
+        if (i >= out_len - 1)
+            goto bad;
+        out[i++] = (char)ch;
     }
+    if (*p != '"')
+        goto bad;
     out[i] = '\0';
+    return 0;
+bad:
+    explicit_bzero(out, out_len);
+    return -1;
+}
+
+/* Encode une chaîne en JSON (guillemets, barres obliques, caractères de contrôle). */
+static int json_escape(const char *in, char *out, size_t out_len)
+{
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)in; *p; p++) {
+        char tmp[8];
+        const char *add;
+        if (*p == '"') add = "\\\"";
+        else if (*p == '\\') add = "\\\\";
+        else if (*p < 0x20) { snprintf(tmp, sizeof(tmp), "\\u%04x", *p); add = tmp; }
+        else { tmp[0] = (char)*p; tmp[1] = '\0'; add = tmp; }
+        size_t n = strlen(add);
+        if (o + n >= out_len)
+            return -1;
+        memcpy(out + o, add, n);
+        o += n;
+    }
+    out[o] = '\0';
+    return 0;
 }
 
 static int is_remote(pam_handle_t *pamh)
@@ -226,11 +285,25 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if (o.notify) {
         /* Placé après le mot de passe : n'est atteint que si celui-ci était correct.
          * Lève le verrouillage et satisfait la règle « mot de passe au démarrage ». */
+        /* Le mot de passe qui vient d'être vérifié est transmis : le service le conserve
+         * (chiffré) seulement si l'utilisateur a choisi le visage au démarrage, pour
+         * ouvrir le trousseau. Sinon il l'ignore. */
         struct conn c;
-        snprintf(request, sizeof(request), "{\"op\": \"password_ok\", \"user\": \"%s\"}\n", user);
-        if (conn_open(&c, o.socket, request, 2) == 0)
+        char escaped[1100], big[1300];
+        const void *tok = NULL;
+        escaped[0] = '\0';
+        if (pam_get_item(pamh, PAM_AUTHTOK, &tok) == PAM_SUCCESS && tok && strlen(tok) <= 256)
+            json_escape(tok, escaped, sizeof(escaped));
+        if (escaped[0])
+            snprintf(big, sizeof(big), "{\"op\": \"password_ok\", \"user\": \"%s\", \"authtok\": \"%s\"}\n",
+                     user, escaped);
+        else
+            snprintf(big, sizeof(big), "{\"op\": \"password_ok\", \"user\": \"%s\"}\n", user);
+        if (conn_open(&c, o.socket, big, 3) == 0)
             conn_line(&c, resp, sizeof(resp));
         conn_close(&c);
+        explicit_bzero(escaped, sizeof(escaped));
+        explicit_bzero(big, sizeof(big));
         return PAM_IGNORE;
     }
 
@@ -264,6 +337,15 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if (starts_with(resp, "{\"ok\": true")) {
         if (!o.quiet)
             pam_info(pamh, "Sentinel : visage reconnu.");
+        {
+            /* Connexion par le visage : mot de passe rendu par le service (option
+             * « connexion au démarrage ») pour que pam_gnome_keyring ouvre le trousseau. */
+            char tok[300];
+            if (json_string(resp, "authtok", tok, sizeof(tok)) == 0 && tok[0])
+                pam_set_item(pamh, PAM_AUTHTOK, tok);
+            explicit_bzero(tok, sizeof(tok));
+            explicit_bzero(resp, sizeof(resp));
+        }
         return PAM_SUCCESS;
     }
 

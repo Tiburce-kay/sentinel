@@ -32,6 +32,26 @@ INCLUDE = re.compile(r"^\s*@include\s+common-auth\s*$")
 FACE_LINE = f"auth\tsufficient\tpam_sentinel.so\t\t{MARK}"
 NOTIFY_LINE = f"auth\toptional\tpam_sentinel.so notify\t{MARK}"
 
+# Écran de connexion (gdm-password) : avec « sufficient », un succès du visage
+# arrêterait la pile AVANT pam_gnome_keyring, et le trousseau resterait verrouillé.
+# Ici, le succès passe par pam_gnome_keyring (qui reçoit le mot de passe rendu par
+# Sentinel), puis termine ; un échec saute ces deux lignes et mène au mot de passe.
+# En phase d'authentification, un saut ne modifie pas le résultat de la pile : un
+# échec du visage ne peut donc pas faire échouer un mot de passe correct.
+KEYRING_LINES = [
+    f"auth\t[success=ok default=2]\tpam_sentinel.so\t\t{MARK}",
+    f"auth\toptional\tpam_gnome_keyring.so\t\t{MARK}",
+    f"auth\t[success=done default=die]\tpam_permit.so\t{MARK}",
+]
+KEYRING_SERVICES = ("gdm-password",)
+MODULE_DIRS = ("/usr/lib/x86_64-linux-gnu/security", "/lib/x86_64-linux-gnu/security",
+               "/usr/lib/aarch64-linux-gnu/security", "/lib/security", "/usr/lib/security",
+               "/usr/lib64/security")
+
+
+def keyring_module_present() -> bool:
+    return any(Path(d, "pam_gnome_keyring.so").exists() for d in MODULE_DIRS)
+
 
 class PamConfError(Exception):
     pass
@@ -41,7 +61,7 @@ def is_enabled(text: str) -> bool:
     return any("pam_sentinel.so" in line for line in text.splitlines())
 
 
-def enable(text: str) -> str:
+def enable(text: str, keyring: bool = False) -> str:
     if is_enabled(text):
         return text
     lines = text.splitlines()
@@ -49,12 +69,13 @@ def enable(text: str) -> str:
     if len(idx) != 1:
         raise PamConfError("disposition non prise en charge : « @include common-auth » attendu une seule fois")
     i = idx[0]
-    out = lines[:i] + [FACE_LINE, lines[i], NOTIFY_LINE] + lines[i + 1:]
+    face = KEYRING_LINES if keyring else [FACE_LINE]
+    out = lines[:i] + face + [lines[i], NOTIFY_LINE] + lines[i + 1:]
     return "\n".join(out) + "\n"
 
 
 def disable(text: str) -> str:
-    lines = [line for line in text.splitlines() if not ("pam_sentinel.so" in line and MARK in line)]
+    lines = [line for line in text.splitlines() if not line.rstrip().endswith(MARK)]
     return "\n".join(lines) + "\n"
 
 
@@ -74,7 +95,9 @@ def apply(service: str, on: bool, pam_dir: Path = PAM_DIR) -> str:
     if not path.exists():
         raise PamConfError(f"{path} introuvable")
     text = path.read_text()
-    new = enable(text) if on else disable(text)
+    keyring = service in KEYRING_SERVICES and keyring_module_present()
+    # Réactiver remplace une ancienne disposition par la disposition actuelle.
+    new = enable(disable(text), keyring) if on else disable(text)
     if new == text:
         return "déjà activé" if on else "déjà désactivé"
     backup = path.with_name(f"{service}.sentinel-backup")
