@@ -48,6 +48,8 @@ sudo scripts/install.sh            # service isolé, module PAM, assistant graph
    sudo /usr/local/sbin/sentinel-pam enable sudo
    sudo -k && sudo true             # test, dans un nouveau terminal
    ```
+3. Écran de verrouillage GNOME : `sudo /usr/local/sbin/sentinel-pam enable gdm-password`
+   (secours : Ctrl+Alt+F3, connexion par mot de passe, puis `… disable gdm-password`).
 
 Le mot de passe reste toujours possible : en cas d'échec, de délai ou de panne, `sudo`
 le demande comme d'habitude. Désactiver : `sudo /usr/local/sbin/sentinel-pam disable sudo`.
