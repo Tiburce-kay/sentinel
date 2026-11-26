@@ -134,7 +134,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 3b | Assistant graphique d'enrôlement (GTK4) : 5 poses, relief, calibration, vérification, confirmation par mot de passe | ✔ (à essayer avec la caméra) |
 | 3c | Module `pam_sentinel.so` (C), service systemd isolé (sans réseau, seule la caméra), installateur, activation PAM réversible ; `sudo` | ✔ en usage réel sur le T570 |
 | 4 | Écran de verrouillage GNOME (gdm-password) : déverrouillage par le visage, connexion au démarrage toujours par mot de passe | ✔ (1,89 s sur le T570) |
-| 4a | Visage dès le démarrage (option) + trousseau ; abandon immédiat si trop sombre / aucun visage ; bouton « utiliser le mot de passe » sur l'écran de verrouillage (extension GNOME) | ✔ code et tests, à essayer sur le T570 |
+| 4a | Visage dès le démarrage (option) + trousseau ouvert automatiquement ; abandon immédiat si trop sombre / aucun visage ; extension GNOME (écrans de connexion et de verrouillage) : champ du mot de passe masqué pendant la vérification, bouton « utiliser le mot de passe » | ✔ en usage réel sur le T570 (26/11) |
 | 4b | Verrouillage automatique en cas d'absence, alerte regard indiscret | à faire |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
 | 6 | Clé scellée dans le TPM, mise à jour adaptative des gabarits | à faire |
