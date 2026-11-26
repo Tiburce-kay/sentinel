@@ -336,7 +336,7 @@ def check_row(text: str) -> Gtk.Box:
 
 class Wizard(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, backend_factory, snapshot_dir: Path | None = None):
-        super().__init__(application=app, title="Sentinel", default_width=520, default_height=640)
+        super().__init__(application=app, title="Sentinel", default_width=540, default_height=700)
         self.backend_factory = backend_factory
         self.backend = None
         self.snapshot_dir = snapshot_dir
@@ -364,7 +364,7 @@ class Wizard(Adw.ApplicationWindow):
         return Adw.StatusPage(icon_name=icon, title=title, description=description, child=clamp)
 
     def _welcome(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         for text in ("Tout reste sur cet ordinateur, sans Internet",
                      "Aucune photo de vous n'est enregistrée",
                      "Votre mot de passe reste toujours utilisable"):
@@ -378,15 +378,19 @@ class Wizard(Adw.ApplicationWindow):
         self.start_button.add_css_class("pill")
         self.start_button.connect("clicked", lambda *_: self._start_capture())
         box.append(self.start_button)
-        self.settings_button = Gtk.Button(label="Modifier mes réglages", halign=Gtk.Align.CENTER, visible=False)
+        # Actions secondaires côte à côte, juste sous le bouton principal : visibles
+        # sans faire défiler (essai réel : empilées, elles sortaient de la fenêtre).
+        secondary = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER)
+        self.settings_button = Gtk.Button(label="Modifier mes réglages", visible=False)
         self.settings_button.add_css_class("flat")
         self.settings_button.connect("clicked", lambda *_: self._open_settings())
-        box.append(self.settings_button)
-        self.remove_button = Gtk.Button(label="Supprimer mon visage", halign=Gtk.Align.CENTER, visible=False)
+        secondary.append(self.settings_button)
+        self.remove_button = Gtk.Button(label="Supprimer mon visage", visible=False)
         self.remove_button.add_css_class("destructive-action")
         self.remove_button.add_css_class("flat")
         self.remove_button.connect("clicked", lambda *_: self._ask_remove())
-        box.append(self.remove_button)
+        secondary.append(self.remove_button)
+        box.append(secondary)
         page = self._status_page("camera-web-symbolic", "Déverrouillez votre PC avec votre visage",
                                  "Sentinel reconnaît votre visage et vérifie qu'il s'agit bien de vous, "
                                  "en vrai, et non d'une photo ou d'une vidéo.", box)
