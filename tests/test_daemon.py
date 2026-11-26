@@ -255,3 +255,18 @@ def test_desactiver_le_demarrage_efface_le_mot_de_passe(service):
     with service.client() as c:
         r = c.call("set_uses", password=PASSWORD, uses={"login": False})
     assert r["ok"] and service.store.load_secret("alice") is None
+
+
+def test_defi_transmis_au_client_et_echec_compte(service):
+    from tests.test_enrollment import FixedLiveness
+    enroll(service)
+    service.engine.liveness = FixedLiveness(0.0)
+    service.engine.choose = lambda options: "droite"
+    service.scenes = [Shot(ME, -0.5)] * 60   # vivant « limite », ne bouge pas
+    with service.client() as c:
+        c._send({"op": "authenticate", "service": "sudo", "progress": True})
+        lines = [c._recv() for _ in range(3)]
+    assert lines[0] == {"event": "camera"}
+    assert lines[1] == {"event": "challenge", "message": "Tournez la tête vers votre droite"}
+    assert lines[2]["status"] == "challenge_failed"
+    assert service.store.failures("alice") == 1

@@ -212,3 +212,68 @@ def test_autre_personne_tete_parfois_tournee_reste_un_echec():
     T = np.stack([ME])
     seq = [Shot(OTHER, 1.0)] * 5 + [Shot(OTHER, 1.0, yaw_deg=-30)] * 25
     assert auth_engine().authenticate(seq, T).status.name == "NO_MATCH"
+
+
+# --- Défi adaptatif au risque (tourner la tête, direction tirée au sort) ------------
+
+class FixedLiveness:
+    def __init__(self, value):
+        self.value = value
+
+    def score(self, s, f):
+        return s.live if s.live is not None else self.value
+
+
+def challenge_engine(direction="gauche"):
+    e = session().e
+    e.liveness = FixedLiveness(0.0)
+    e.choose = lambda options: direction
+    return e
+
+
+T1 = np.stack([ME])
+
+
+def test_vivant_sans_ambiguite_aucun_defi():
+    asked = []
+    r = challenge_engine().authenticate([Shot(ME, 3.0)] * 15, T1, on_challenge=asked.append)
+    assert r.ok and asked == [] and r.challenge == ""
+
+
+def test_score_limite_defi_reussi_dans_le_bon_sens():
+    asked = []
+    seq = [Shot(ME, -0.5)] * 10 + [Shot(ME, -0.5, yaw_deg=25)] * 5
+    r = challenge_engine("gauche").authenticate(seq, T1, on_challenge=asked.append)
+    assert asked == ["Tournez la tête vers votre gauche"] and r.ok
+
+
+def test_defi_mauvais_sens_refuse():
+    seq = [Shot(ME, -0.5)] * 10 + [Shot(ME, -0.5, yaw_deg=25)] * 5  # tourne à gauche
+    r = challenge_engine("droite").authenticate(seq, T1, on_challenge=lambda m: None)
+    assert r.status.name == "CHALLENGE_FAILED"
+
+
+def test_video_qui_ne_bouge_pas_refusee():
+    seq = [Shot(ME, -0.5)] * 60
+    r = challenge_engine().authenticate(seq, T1, on_challenge=lambda m: None)
+    assert r.status.name == "CHALLENGE_FAILED"
+
+
+def test_photo_inclinee_sans_relief_refusee():
+    from tests.head import FLAT
+    seq = [Shot(ME, -0.5, FLAT)] * 10 + [Shot(ME, -0.5, FLAT, yaw_deg=45)] * 40
+    r = challenge_engine("gauche").authenticate(seq, T1, on_challenge=lambda m: None)
+    assert r.status.name == "CHALLENGE_FAILED"
+
+
+def test_autre_personne_pendant_le_defi_refusee():
+    seq = [Shot(ME, -0.5)] * 10 + [Shot(OTHER, -0.5, yaw_deg=25)] * 30
+    r = challenge_engine("gauche").authenticate(seq, T1, on_challenge=lambda m: None)
+    assert r.status.name == "CHALLENGE_FAILED"
+
+
+def test_sans_afficheur_de_consigne_pas_de_defi():
+    """Un appelant qui ne peut pas afficher la consigne (vérification de l'assistant) :
+    pas de défi, impossible à relever."""
+    r = challenge_engine().authenticate([Shot(ME, -0.5)] * 15, T1)
+    assert r.ok and r.challenge == ""

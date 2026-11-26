@@ -143,8 +143,9 @@ def cmd_test(cfg: Config, args) -> int:
         if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
             print("Refusé : ce n'est pas la caméra utilisée à l'enrôlement.")
             return 1
-        res = engine.authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings, enr.liveness_threshold,
-                                  enr.stats.get("reference_pose"))
+        res = engine.authenticate(cam.frames(cfg.auth.timeout_s + cfg.auth.challenge_timeout_s),
+                                  enr.embeddings, enr.liveness_threshold, enr.stats.get("reference_pose"),
+                                  on_challenge=lambda m: print(f"  >>> {m}", flush=True))
     lv = res.liveness_scores
     print(f"Résultat : {res.status.value}")
     print(f"  similarité max {res.best_similarity:.3f} (seuil {cfg.recognition.threshold})")

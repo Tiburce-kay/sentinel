@@ -81,7 +81,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 |---|---|---|
 | Photo imprimée | Texture (MiniFASNet) | Phase 2 ✔ |
 | Photo ou vidéo sur un écran | Texture + défi aléatoire | Texture ✔, défi : phase 2b |
-| Vidéo préenregistrée de l'utilisateur | Défi aléatoire (cligner, tourner la tête), reflet d'une séquence de couleurs | Phase 2b |
+| Vidéo préenregistrée de l'utilisateur | Défi adaptatif au risque : si le vivant est « limite », tourner la tête dans une direction tirée au sort, avec relief 3D et identité vérifiés pendant le geste | ✔ testé (reflet de couleurs : assistant seulement, à venir) |
 | Caméra virtuelle qui diffuse une vidéo | Pilote uvcvideo exigé, identité épinglée | ✔ |
 | Gabarit d'un autre compte copié (Face Swap) | AAD liée au nom d'utilisateur | ✔ testé |
 | Gabarit fabriqué ailleurs (Faceplant) | Clé locale ; tout gabarit chiffré avec une autre clé est refusé | ✔ testé |
@@ -129,7 +129,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 |---|---|---|
 | 1 | Conception, modèle de menaces | ✔ |
 | 2 | Moteur : caméra, détection, empreinte, vivant (texture), stockage chiffré, CLI, calibration | ✔ (calibré sur le T570) |
-| 2b | Défi aléatoire actif ; reflet d'une séquence de couleurs de l'écran | à faire |
+| 2b | Défi adaptatif au risque (tourner la tête, direction tirée au sort, relief + identité) ; reflet de couleurs dans l'assistant | défi ✔, reflet à faire |
 | 3a | Service `sentineld` : socket Unix, identité par SO_PEERCRED + logind, mot de passe via PAM, verrouillage, « mot de passe au démarrage » | ✔ |
 | 3b | Assistant graphique d'enrôlement (GTK4) : 5 poses, relief, calibration, vérification, confirmation par mot de passe | ✔ (à essayer avec la caméra) |
 | 3c | Module `pam_sentinel.so` (C), service systemd isolé (sans réseau, seule la caméra), installateur, activation PAM réversible ; `sudo` | ✔ en usage réel sur le T570 |

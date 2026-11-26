@@ -129,8 +129,9 @@ def test_vrai_visage_interrompu_reste_un_delai():
 
 def test_seuil_personnel_applique_et_borne():
     seq = [Scene(ME, live=-1.5)] * 15
-    assert not engine().authenticate(seq, T).ok                      # seuil global -1,0
-    assert engine().authenticate(seq, T, liveness_threshold=-1.8).ok  # seuil personnel
+    e = engine(liveness__challenge=False)  # ce test porte sur le seuil, pas sur le défi
+    assert not e.authenticate(seq, T).ok                      # seuil global -1,0
+    assert e.authenticate(seq, T, liveness_threshold=-1.8).ok  # seuil personnel
     # Un seuil personnel sous le plancher (-2,0) est ramené au plancher.
     r = engine().authenticate([Scene(ME, live=-2.5)] * 15, T, liveness_threshold=-9.0)
     assert not r.ok and r.liveness_threshold == -2.0

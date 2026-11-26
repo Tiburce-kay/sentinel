@@ -32,7 +32,7 @@
 #include <unistd.h>
 
 #define DEFAULT_SOCKET "/run/sentinel/sentinel.sock"
-#define DEFAULT_TIMEOUT_S 8 /* 4 s d'analyse + ouverture de la caméra + marge */
+#define DEFAULT_TIMEOUT_S 12 /* 4 s d'analyse + 3 s de défi éventuel + caméra + marge */
 #define MAX_RESPONSE 2048
 
 struct options {
@@ -321,10 +321,17 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     struct conn c;
     int ok = conn_open(&c, o.socket, request, o.timeout_s) == 0 && conn_line(&c, resp, sizeof(resp)) == 0;
-    if (ok && starts_with(resp, "{\"event\": \"camera\"")) {
-        /* Le service va allumer la caméra : c'est le moment de le dire. */
-        if (!o.quiet)
-            pam_info(pamh, "Sentinel : regardez la caméra…");
+    /* Messages intermédiaires du service, avant la réponse finale :
+     *   camera    : la caméra s'allume ;
+     *   challenge : défi à relever (« Tournez la tête vers votre gauche »). */
+    while (ok && starts_with(resp, "{\"event\": ")) {
+        if (starts_with(resp, "{\"event\": \"camera\"")) {
+            if (!o.quiet)
+                pam_info(pamh, "Sentinel : regardez la caméra…");
+        } else if (starts_with(resp, "{\"event\": \"challenge\"")) {
+            if (json_string(resp, "message", msg, sizeof(msg)) == 0 && msg[0])
+                pam_info(pamh, "Sentinel : %s.", msg);
+        }
         ok = conn_line(&c, resp, sizeof(resp)) == 0;
     }
     conn_close(&c);

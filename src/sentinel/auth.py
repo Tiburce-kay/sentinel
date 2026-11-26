@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 import math
+import secrets
 import time
 from collections import deque
 from collections.abc import Callable, Iterable
@@ -18,7 +19,7 @@ from typing import Protocol
 import numpy as np
 
 from .config import Config
-from .geometry import Pose, landmarks
+from .geometry import Pose, landmarks, parallax
 from .vision import Face, Quality, assess, best_similarity, largest
 
 
@@ -48,6 +49,7 @@ class Status(enum.Enum):
     TIMEOUT = "délai écoulé avant confirmation (restez face à la caméra)"
     TURNED = "tête trop tournée : regardez l'écran, de face"
     TOO_DARK = "trop sombre : utilisez votre mot de passe"
+    CHALLENGE_FAILED = "défi non réussi : utilisez votre mot de passe"
     SKIPPED = "passage au mot de passe"
     SPOOF = "usurpation suspectée (photo, écran ou vidéo)"
     LOCKED = "trop d'échecs : mot de passe requis"
@@ -63,6 +65,7 @@ class AuthResult:
     window_liveness: float = -math.inf   # meilleure moyenne de vivant sur une fenêtre complète
     liveness_threshold: float = math.nan  # seuil effectivement appliqué
     skipped_pose: int = 0                 # images ignorées : tête trop tournée
+    challenge: str = ""                   # direction demandée, si un défi a eu lieu
     camera_s: float = 0.0                 # temps passé à attendre la caméra
     compute_s: float = 0.0                # temps passé à analyser
     elapsed_s: float = 0.0
@@ -79,6 +82,8 @@ class Engine:
     recognizer: RecognizerLike
     liveness: LivenessLike | None = None
     quality: Callable[[np.ndarray, Face], Quality] | None = None
+    # Tirage de la direction du défi (aléatoire cryptographique ; remplaçable en test).
+    choose: Callable[[tuple], str] = field(default=secrets.choice)
 
     def _quality(self, frame: np.ndarray, face: Face) -> Quality:
         if self.quality is not None:
@@ -86,6 +91,44 @@ class Engine:
         return assess(frame, face, self.cfg.quality)
 
     # --- Authentification -----------------------------------------------------
+
+    def _challenge(self, frames, templates: np.ndarray, ref_pts: np.ndarray, result: AuthResult,
+                   should_abort, on_challenge) -> Status:
+        """Défi adaptatif au risque : « tournez la tête vers votre gauche/droite », tiré
+        au sort. Une vidéo préenregistrée ne peut pas deviner la direction ; une photo
+        qu'on incline n'a pas de relief (parallaxe du nez, voir geometry.py) ; et le
+        visage doit rester reconnu pendant le geste."""
+        a, ec = self.cfg.auth, self.cfg.enroll
+        direction = self.choose(("gauche", "droite"))
+        result.challenge = direction
+        if on_challenge is not None:
+            on_challenge(f"Tournez la tête vers votre {direction}")
+        sign = 1.0 if direction == "gauche" else -1.0
+        ref = Pose.of(ref_pts)
+        deadline = time.monotonic() + a.challenge_timeout_s
+        good = 0
+        for frame in frames:
+            if should_abort is not None and should_abort():
+                return Status.SKIPPED
+            if time.monotonic() > deadline:
+                break
+            face = largest(self.detector.detect(frame))
+            if face is None:
+                continue
+            pts = landmarks(face.raw)
+            dy = (Pose.of(pts).yaw - ref.yaw) * sign
+            if dy < -ec.yaw_delta:
+                return Status.CHALLENGE_FAILED  # tourné dans le mauvais sens
+            if dy < ec.yaw_delta:
+                continue
+            if best_similarity(self.recognizer.embed(frame, face), templates) < self.cfg.recognition.threshold:
+                continue
+            if parallax(ref_pts, pts) < ec.min_parallax:
+                continue  # aucun relief : support plat
+            good += 1
+            if good >= 2:
+                return Status.SUCCESS
+        return Status.CHALLENGE_FAILED
 
     def _turned(self, face: Face, ref: Pose | None) -> bool:
         """Tête nettement tournée par rapport à la position de face de l'utilisateur."""
@@ -110,7 +153,8 @@ class Engine:
     def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray,
                      liveness_threshold: float | None = None,
                      reference_pose: tuple[float, float] | None = None,
-                     should_abort: Callable[[], bool] | None = None) -> AuthResult:
+                     should_abort: Callable[[], bool] | None = None,
+                     on_challenge: Callable[[str], None] | None = None) -> AuthResult:
         """Accepte quand `window_frames` images CONSÉCUTIVES montrent chacune un visage
         de qualité, reconnu comme le bon, ET que la moyenne de leurs scores de vivant
         dépasse le seuil.
@@ -142,7 +186,10 @@ class Engine:
         t_last = time.monotonic()
         try:
             a = self.cfg.auth
+            frames = iter(frames)  # la phase de défi reprend le même flux d'images
             face_seen = False
+            challenge_ref = None   # points du visage de face, si un défi est nécessaire
+            last_pts = None
             dark_since: float | None = None
             for frame in frames:
                 t_frame = time.monotonic()
@@ -153,6 +200,8 @@ class Engine:
                 # ne peut visiblement pas réussir (demande de l'utilisateur, noir, absence).
                 if should_abort is not None and should_abort():
                     result.status = Status.SKIPPED
+                    break
+                if t_frame - start > a.timeout_s:
                     break
                 face = largest(self.detector.detect(frame))
                 quality = self._quality(frame, face) if face is not None else None
@@ -189,18 +238,28 @@ class Engine:
                 if use_live:
                     result.liveness_scores.append(live)
                 window.append(live)
+                last_pts = landmarks(face.raw)
                 if len(window) < k:
                     continue
                 mean = float(np.mean(window)) if use_live else float("inf")
                 result.window_liveness = max(result.window_liveness, mean)
                 if mean >= live_t:
-                    result.status = Status.SUCCESS
+                    if use_live and lc.challenge and on_challenge is not None \
+                            and mean < live_t + lc.challenge_margin:
+                        # Réussite « limite » : on demande un geste imprévisible avant
+                        # d'accepter (voir _challenge).
+                        challenge_ref = last_pts
+                    else:
+                        result.status = Status.SUCCESS
                     break
                 full_window_spoof = True
+            if challenge_ref is not None:
+                result.status = self._challenge(frames, templates, challenge_ref, result,
+                                                should_abort, on_challenge)
         finally:
             if pool is not None:
                 pool.shutdown(wait=True)
-        if result.status not in (Status.SUCCESS, Status.SKIPPED, Status.TOO_DARK):
+        if result.status not in (Status.SUCCESS, Status.SKIPPED, Status.TOO_DARK, Status.CHALLENGE_FAILED):
             partial = result.liveness_scores
             if full_window_spoof or (len(partial) >= 3 and float(np.mean(partial)) < live_t):
                 # Pas de fenêtre complète, mais les images reconnues étaient nettement

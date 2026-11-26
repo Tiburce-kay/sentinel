@@ -226,3 +226,11 @@ def test_notify_transmet_le_mot_de_passe_echappe(built, tmp_path):
         face.close()
         notify.close()
     assert notify.requests == [{"op": "password_ok", "user": "alice", "authtok": secret}]
+
+
+def test_defi_affiche_puis_reussi(built, tmp_path):
+    out, _ = run(built, tmp_path, [{"event": "camera"},
+                                   {"event": "challenge", "message": "Tournez la tête vers votre gauche"},
+                                   {"ok": True, "status": "success"}])
+    assert "Tournez la tête vers votre gauche" in out
+    assert "résultat PAM : Success" in out

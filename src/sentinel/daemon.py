@@ -273,15 +273,21 @@ class Handler(socketserver.StreamRequestHandler):
             with st.open_camera() as cam:
                 if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
                     raise Refused("camera", "caméra différente de celle de l'enrôlement")
-                res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), enr.embeddings,
-                                                   enr.liveness_threshold, enr.stats.get("reference_pose"),
-                                                   should_abort=lambda: st.skip_pending(user))
+                def challenge(message: str) -> None:
+                    if req.get("progress"):
+                        self.send({"event": "challenge", "message": message})
+                # Caméra ouverte assez longtemps pour un éventuel défi.
+                res = st.get_engine().authenticate(
+                    cam.frames(cfg.auth.timeout_s + cfg.auth.challenge_timeout_s), enr.embeddings,
+                    enr.liveness_threshold, enr.stats.get("reference_pose"),
+                    should_abort=lambda: st.skip_pending(user),
+                    on_challenge=challenge if req.get("progress") else None)
         finally:
             st.camera_lock.release()
             st.consume_skip(user)
         if res.ok:
             st.store.set_failures(user, 0)
-        elif res.status in (Status.SPOOF, Status.NO_MATCH):
+        elif res.status in (Status.SPOOF, Status.NO_MATCH, Status.CHALLENGE_FAILED):
             st.store.set_failures(user, st.store.failures(user) + 1)
         log.info("authentification user=%s service=%s résultat=%s durée=%.2fs",
                  user, service, res.status.name, res.elapsed_s)

@@ -57,6 +57,10 @@ class LivenessConfig:
     # contre une adaptation qui rendrait le système plus facile à tromper (pire
     # attaque mesurée : -3,45 ; voir docs/CALIBRATION.md). Provisoire : à valider
     # sur plusieurs webcams et plusieurs personnes.
+    # Défi adaptatif : si la moyenne de vivant dépasse le seuil de moins de cette marge,
+    # Sentinel demande de tourner la tête (direction tirée au sort) avant d'accepter.
+    challenge: bool = True
+    challenge_margin: float = 1.0
     floor: float = -2.0
     # Plafond = seuil validé : l'enrôlement se fait en conditions idéales (écran blanc,
     # face à la caméra), qui gonflent les scores. Un seuil personnel plus strict que
@@ -93,6 +97,7 @@ class AuthConfig:
     # ignorée : le modèle de vivant n'est pas fiable de profil (essai réel du 25/11).
     # Abandons anticipés (le mot de passe s'affiche aussitôt) : image trop sombre
     # pendant tant de secondes, ou aucun visage depuis le début de la tentative.
+    challenge_timeout_s: float = 3.0
     give_up_dark_s: float = 1.0
     give_up_no_face_s: float = 1.5
     max_yaw: float = 0.12
