@@ -1,8 +1,21 @@
 {
   "uuid": "sentinel@tiburce-kay.github.io",
   "name": "Sentinel",
-  "description": "Ajoute un bouton clé à l'écran de verrouillage pour passer de la reconnaissance faciale Sentinel au mot de passe.",
-  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
-  "session-modes": ["user", "unlock-dialog"],
-  "url": "https://github.com/Tiburce-kay/sentinel"
+  "description": "Écran de connexion et de verrouillage : champ du mot de passe masqué pendant la reconnaissance faciale Sentinel, bouton clé pour passer au mot de passe.",
+  "shell-version": [
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51"
+  ],
+  "session-modes": [
+    "user",
+    "unlock-dialog",
+    "gdm"
+  ],
+  "url": "https://github.com/Tiburce-kay/sentinel",
+  "version": 2
 }

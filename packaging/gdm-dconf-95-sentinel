@@ -1,0 +1,4 @@
+# Sentinel : extension de l'écran de connexion (champ du mot de passe masqué pendant
+# la reconnaissance faciale, bouton « Utiliser le mot de passe »).
+[org/gnome/shell]
+enabled-extensions=['sentinel@tiburce-kay.github.io']

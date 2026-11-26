@@ -309,8 +309,11 @@ class Handler(socketserver.StreamRequestHandler):
         self.send(reply)
 
     def op_skip(self, req: dict) -> None:
-        """« Passer au mot de passe » (bouton clé de l'écran de verrouillage)."""
-        user = self._user(req)
+        """« Passer au mot de passe » (bouton clé). À l'écran de connexion, la demande
+        vient de GDM (compte système) pour l'utilisateur choisi : autorisée pour tout
+        compte depuis une session active devant la machine, car elle ne peut que faire
+        demander un mot de passe, jamais donner un accès."""
+        user = validate_username(req.get("user") or self.peer.username)
         self._require_local()
         self.state.request_skip(user)
         self.send({"ok": True})

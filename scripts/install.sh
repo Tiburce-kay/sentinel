@@ -99,6 +99,13 @@ EXT=sentinel@tiburce-kay.github.io
 rm -rf "/usr/share/gnome-shell/extensions/$EXT"
 install -d -m 0755 "/usr/share/gnome-shell/extensions/$EXT"
 install -m 0644 "$REPO/packaging/gnome-shell-extension/$EXT/"* "/usr/share/gnome-shell/extensions/$EXT/"
+# Écran de connexion (GDM, Debian/Ubuntu) : extension activée pour le compte système de
+# GDM, via le mécanisme prévu par la distribution (fichiers compilés au démarrage de GDM).
+if [ -x /usr/share/gdm/generate-config ] && [ -d /usr/share/gdm/dconf ]; then
+    install -m 0644 "$REPO/packaging/gdm-dconf-95-sentinel" /usr/share/gdm/dconf/95-sentinel
+    /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    echo "extension activée pour l'écran de connexion (au prochain démarrage de GDM)"
+fi
 
 say "7/7 Service sentineld"
 install -m 0644 "$REPO/packaging/sentineld.service" /etc/systemd/system/sentineld.service

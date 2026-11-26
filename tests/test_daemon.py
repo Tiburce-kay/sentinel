@@ -270,3 +270,18 @@ def test_defi_transmis_au_client_et_echec_compte(service):
     assert lines[1] == {"event": "challenge", "message": "Tournez la tête vers votre droite"}
     assert lines[2]["status"] == "challenge_failed"
     assert service.store.failures("alice") == 1
+
+
+def test_ecran_de_connexion_peut_demander_le_mot_de_passe_pour_un_utilisateur(service):
+    """GDM (autre compte) demande « passer au mot de passe » pour l'utilisateur choisi."""
+    enroll(service)
+    service.scenes = [Shot(ME, 1.0)] * 20
+    with service.client() as c:
+        assert c.call("skip", user="bob")["ok"]
+        assert "bob" in service.skip_requests
+
+
+def test_demande_de_mot_de_passe_refusee_a_distance(service):
+    service.local = False
+    with service.client() as c:
+        assert c.call("skip", user="alice")["status"] == "forbidden"
