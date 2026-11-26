@@ -21,7 +21,7 @@ for d in /usr/lib/x86_64-linux-gnu/security /lib/x86_64-linux-gnu/security \
 done
 rm -f /etc/pam.d/sentinel-confirm /usr/local/bin/sentinel /usr/local/sbin/sentinel-pam \
       /usr/local/bin/sentinel-setup /usr/share/applications/sentinel-setup.desktop
-rm -rf /opt/sentinel /usr/share/sentinel
+rm -rf /opt/sentinel /usr/share/sentinel /usr/share/gnome-shell/extensions/sentinel@tiburce-kay.github.io
 if [ "${1:-}" = "--keep-data" ]; then
     echo "Données conservées : /var/lib/sentinel et /etc/sentinel"
 else

@@ -92,6 +92,13 @@ PYTHONPATH=$PREFIX/gui exec /usr/bin/python3 -m sentinel.gui "\$@"
 SH
 chmod 0755 /usr/local/bin/sentinel-setup
 install -m 0644 "$REPO/packaging/sentinel-setup.desktop" /usr/share/applications/sentinel-setup.desktop
+# Extension GNOME Shell : bouton « utiliser le mot de passe » sur l'écran de
+# verrouillage. Activée pour chaque utilisateur par l'assistant (prise en compte à la
+# prochaine ouverture de session).
+EXT=sentinel@tiburce-kay.github.io
+rm -rf "/usr/share/gnome-shell/extensions/$EXT"
+install -d -m 0755 "/usr/share/gnome-shell/extensions/$EXT"
+install -m 0644 "$REPO/packaging/gnome-shell-extension/$EXT/"* "/usr/share/gnome-shell/extensions/$EXT/"
 
 say "7/7 Service sentineld"
 install -m 0644 "$REPO/packaging/sentineld.service" /etc/systemd/system/sentineld.service

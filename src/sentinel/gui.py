@@ -124,6 +124,25 @@ class DemoBackend:
         return {"ok": bool(password), "uses": uses, "message": "mot de passe incorrect"}
 
 
+EXTENSION_UUID = "sentinel@tiburce-kay.github.io"
+
+
+def enable_lockscreen_button(on: bool) -> None:
+    """Active (ou retire) l'extension du bouton clé pour l'utilisateur courant. Passer
+    par les réglages GNOME fonctionne même si GNOME Shell ne l'a pas encore chargée :
+    elle le sera à la prochaine ouverture de session."""
+    from gi.repository import Gio
+    source = Gio.SettingsSchemaSource.get_default()
+    if source is None or source.lookup("org.gnome.shell", True) is None:
+        return  # pas GNOME Shell : rien à faire
+    settings = Gio.Settings.new("org.gnome.shell")
+    enabled = list(settings.get_strv("enabled-extensions"))
+    if on and EXTENSION_UUID not in enabled:
+        settings.set_strv("enabled-extensions", enabled + [EXTENSION_UUID])
+    elif not on and EXTENSION_UUID in enabled:
+        settings.set_strv("enabled-extensions", [u for u in enabled if u != EXTENSION_UUID])
+
+
 def in_thread(work, done) -> None:
     """Exécute `work` hors de l'interface, puis `done(résultat ou exception)` dans l'interface."""
     def run():
@@ -607,6 +626,11 @@ class Wizard(Adw.ApplicationWindow):
             if isinstance(result, Exception):
                 self._fail(str(result))
             elif result.get("ok"):
+                if isinstance(self.backend, ServiceBackend):
+                    try:
+                        enable_lockscreen_button(uses["lockscreen"])
+                    except Exception:  # noqa: BLE001 — confort, jamais bloquant
+                        pass
                 self._show("done")
             else:
                 self.confirm_error.set_label(result.get("message", "Échec"))

@@ -110,8 +110,15 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 1. **Le mot de passe reste toujours possible.** Sentinel est déclaré `sufficient`
    dans PAM, jamais `required` : en cas d'échec, de panne ou de délai dépassé, la
    demande de mot de passe s'affiche normalement.
-2. **Premier déverrouillage après démarrage : mot de passe.** Il déverrouille aussi
-   le trousseau GNOME. Le visage sert ensuite.
+2. **Démarrage : au choix de l'utilisateur.** Par défaut, le premier déverrouillage
+   après le démarrage se fait par mot de passe (comme Face ID). Avec l'option
+   « connexion au démarrage », Sentinel ouvre la session par le visage, comme Windows
+   Hello. Le trousseau GNOME, chiffré par le mot de passe de connexion, est alors
+   ouvert grâce au mot de passe conservé **chiffré** (AES-256-GCM, lié au compte),
+   rendu uniquement au module PAM après un succès du visage, pour une nouvelle
+   session, et tenu à jour à chaque mot de passe saisi (après vérification PAM).
+   Limite assumée : un attaquant déjà root peut le déchiffrer ; la puce TPM du PC
+   servira de coffre plus solide.
 3. **Après 5 échecs consécutifs**, le visage est refusé jusqu'au prochain mot de passe.
 4. **Installation progressive** : `sudo` d'abord, avec une session root ouverte en
    secours, puis l'écran de verrouillage, puis GDM.
@@ -127,6 +134,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 3b | Assistant graphique d'enrôlement (GTK4) : 5 poses, relief, calibration, vérification, confirmation par mot de passe | ✔ (à essayer avec la caméra) |
 | 3c | Module `pam_sentinel.so` (C), service systemd isolé (sans réseau, seule la caméra), installateur, activation PAM réversible ; `sudo` | ✔ en usage réel sur le T570 |
 | 4 | Écran de verrouillage GNOME (gdm-password) : déverrouillage par le visage, connexion au démarrage toujours par mot de passe | ✔ (1,89 s sur le T570) |
+| 4a | Visage dès le démarrage (option) + trousseau ; abandon immédiat si trop sombre / aucun visage ; bouton « utiliser le mot de passe » sur l'écran de verrouillage (extension GNOME) | ✔ code et tests, à essayer sur le T570 |
 | 4b | Verrouillage automatique en cas d'absence, alerte regard indiscret | à faire |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
 | 6 | Clé scellée dans le TPM, mise à jour adaptative des gabarits | à faire |
