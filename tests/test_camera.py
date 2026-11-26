@@ -85,3 +85,10 @@ def test_lecteur_continu_fin_de_flux():
         seq, frame = g.wait_new(0)
         assert frame == 3
         assert g.wait_new(seq, timeout=0.2)[1] is None and g.ended
+
+
+def test_exposition_reglee():
+    from sentinel.camera import exposure_settled
+    assert not exposure_settled([10, 40, 90, 120, 121], 5)         # encore en train de monter
+    assert exposure_settled([10, 40, 90, 120, 121, 122, 121], 5)    # stable
+    assert not exposure_settled([120, 121, 121], 5)                 # trop peu d'images

@@ -189,6 +189,7 @@ class Engine:
             frames = iter(frames)  # la phase de défi reprend le même flux d'images
             face_seen = False
             challenge_ref = None   # points du visage de face, si un défi est nécessaire
+            gray_pts = None        # dernière fenêtre en zone grise sous le seuil
             last_pts = None
             dark_since: float | None = None
             for frame in frames:
@@ -243,16 +244,28 @@ class Engine:
                     continue
                 mean = float(np.mean(window)) if use_live else float("inf")
                 result.window_liveness = max(result.window_liveness, mean)
+                can_challenge = use_live and lc.challenge and on_challenge is not None
                 if mean >= live_t:
-                    if use_live and lc.challenge and on_challenge is not None \
-                            and mean < live_t + lc.challenge_margin:
+                    if can_challenge and mean < live_t + lc.challenge_margin:
                         # Réussite « limite » : on demande un geste imprévisible avant
                         # d'accepter (voir _challenge).
                         challenge_ref = last_pts
                     else:
                         result.status = Status.SUCCESS
                     break
+                if can_challenge and mean >= max(live_t - lc.challenge_low_margin, lc.challenge_floor):
+                    # Zone grise SOUS le seuil (éclairage difficile, caméra froide…) : plutôt
+                    # que de conclure à une usurpation, on laisse d'abord le temps à une
+                    # fenêtre de passer franchement, puis on propose le défi.
+                    gray_pts = last_pts
+                    if t_frame - start >= a.challenge_after_s:
+                        challenge_ref = gray_pts
+                        break
+                    continue
                 full_window_spoof = True
+            if challenge_ref is None and gray_pts is not None and result.status is not Status.SKIPPED \
+                    and result.status is not Status.TOO_DARK and result.status is not Status.NO_FACE:
+                challenge_ref = gray_pts
             if challenge_ref is not None:
                 result.status = self._challenge(frames, templates, challenge_ref, result,
                                                 should_abort, on_challenge)

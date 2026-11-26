@@ -277,3 +277,26 @@ def test_sans_afficheur_de_consigne_pas_de_defi():
     pas de défi, impossible à relever."""
     r = challenge_engine().authenticate([Shot(ME, -0.5)] * 15, T1)
     assert r.ok and r.challenge == ""
+
+
+def test_zone_grise_sous_le_seuil_defi_plutot_que_refus():
+    """Cas réel (écran de connexion) : moyenne juste SOUS le seuil -> défi, pas « usurpation »."""
+    asked = []
+    seq = [Shot(ME, -1.6)] * 12 + [Shot(ME, -1.6, yaw_deg=25)] * 5
+    e = challenge_engine("gauche")
+    e.cfg.auth.challenge_after_s = 0.0
+    r = e.authenticate(seq, T1, on_challenge=asked.append)
+    assert asked == ["Tournez la tête vers votre gauche"] and r.ok
+
+
+def test_zone_grise_photo_toujours_refusee():
+    from tests.head import FLAT
+    seq = [Shot(ME, -1.6, FLAT)] * 12 + [Shot(ME, -1.6, FLAT, yaw_deg=45)] * 40
+    e = challenge_engine("gauche")
+    e.cfg.auth.challenge_after_s = 0.0
+    assert e.authenticate(seq, T1, on_challenge=lambda m: None).status.name == "CHALLENGE_FAILED"
+
+
+def test_bien_sous_la_zone_grise_reste_une_usurpation():
+    r = challenge_engine().authenticate([Shot(ME, -6.0)] * 40, T1, on_challenge=lambda m: None)
+    assert r.status.name == "SPOOF" and r.challenge == ""

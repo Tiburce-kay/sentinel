@@ -33,8 +33,10 @@ class CameraConfig:
     require_uvc: bool = True
     # Exiger que la caméra soit celle utilisée lors de l'enrôlement.
     pin_identity: bool = True
-    # Images ignorées à l'ouverture, le temps que l'exposition automatique se règle.
+    # Ouverture : images ignorées tant que l'exposition automatique se règle (luminosité
+    # stable), au moins `warmup_frames`, au plus `warmup_max_s` secondes.
     warmup_frames: int = 5
+    warmup_max_s: float = 1.0
 
 
 @dataclass
@@ -61,6 +63,10 @@ class LivenessConfig:
     # Sentinel demande de tourner la tête (direction tirée au sort) avant d'accepter.
     challenge: bool = True
     challenge_margin: float = 1.0
+    # Zone grise sous le seuil : défi plutôt que refus, jusqu'à 1,0 sous le seuil et
+    # jamais sous -2,5 (pire fenêtre d'attaque mesurée : -3,45 ; voir CALIBRATION.md).
+    challenge_low_margin: float = 1.0
+    challenge_floor: float = -2.5
     floor: float = -2.0
     # Plafond = seuil validé : l'enrôlement se fait en conditions idéales (écran blanc,
     # face à la caméra), qui gonflent les scores. Un seuil personnel plus strict que
@@ -98,6 +104,7 @@ class AuthConfig:
     # Abandons anticipés (le mot de passe s'affiche aussitôt) : image trop sombre
     # pendant tant de secondes, ou aucun visage depuis le début de la tentative.
     challenge_timeout_s: float = 3.0
+    challenge_after_s: float = 1.5   # délai avant de proposer le défi en zone grise
     give_up_dark_s: float = 1.0
     give_up_no_face_s: float = 1.5
     max_yaw: float = 0.12

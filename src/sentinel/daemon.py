@@ -87,7 +87,7 @@ class State:
 
     def open_camera(self) -> Camera:
         c = self.cfg.camera
-        return Camera(select_camera(c.device, c.require_uvc), c.width, c.height, c.warmup_frames)
+        return Camera(select_camera(c.device, c.require_uvc), c.width, c.height, c.warmup_frames, c.warmup_max_s)
 
     # --- Politique de mot de passe ----------------------------------------------
 
@@ -289,8 +289,15 @@ class Handler(socketserver.StreamRequestHandler):
             st.store.set_failures(user, 0)
         elif res.status in (Status.SPOOF, Status.NO_MATCH, Status.CHALLENGE_FAILED):
             st.store.set_failures(user, st.store.failures(user) + 1)
-        log.info("authentification user=%s service=%s résultat=%s durée=%.2fs",
-                 user, service, res.status.name, res.elapsed_s)
+        lv = res.liveness_scores
+        # Mesures numériques uniquement (aucune image) : comprendre un refus a posteriori.
+        log.info("authentification user=%s service=%s résultat=%s durée=%.2fs images=%d ignorées=%d "
+                 "similarité=%.2f vivant[fenêtre max=%s, min=%s, médiane=%s, max=%s] seuil=%.2f défi=%s",
+                 user, service, res.status.name, res.elapsed_s, res.frames, res.skipped_pose,
+                 res.best_similarity,
+                 f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "-",
+                 f"{min(lv):+.2f}" if lv else "-", f"{float(np.median(lv)):+.2f}" if lv else "-",
+                 f"{max(lv):+.2f}" if lv else "-", res.liveness_threshold, res.challenge or "-")
         reply = {"ok": res.ok, "status": res.status.name.lower(), "message": res.status.value,
                  "elapsed": round(res.elapsed_s, 2)}
         if res.ok and self.peer.is_root and use == "login" and enr.uses.get("login"):

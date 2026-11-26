@@ -31,7 +31,7 @@ def _engine(cfg: Config):
 
 def _camera(cfg: Config):
     info = select_camera(cfg.camera.device, cfg.camera.require_uvc)
-    return Camera(info, cfg.camera.width, cfg.camera.height, cfg.camera.warmup_frames)
+    return Camera(info, cfg.camera.width, cfg.camera.height, cfg.camera.warmup_frames, cfg.camera.warmup_max_s)
 
 
 def cmd_init(cfg: Config, args) -> int:

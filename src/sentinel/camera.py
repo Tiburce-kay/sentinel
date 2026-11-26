@@ -114,12 +114,23 @@ def select_camera(device: str, require_uvc: bool, sysfs: Path = SYSFS_V4L) -> Ca
     raise CameraError(f"caméra introuvable : {device}")
 
 
+def exposure_settled(levels: list[float], min_frames: int, tolerance: float = 3.0) -> bool:
+    """Exposition réglée : au moins `min_frames` images, et les 3 dernières ont une
+    luminosité moyenne qui ne varie plus que de quelques niveaux."""
+    if len(levels) < max(min_frames, 3):
+        return False
+    last = levels[-3:]
+    return max(last) - min(last) <= tolerance
+
+
 class Camera:
     """Flux d'images BGR depuis une webcam. Utilisable avec « with »."""
 
-    def __init__(self, info: CameraInfo, width: int, height: int, warmup: int = 5):
+    def __init__(self, info: CameraInfo, width: int, height: int, warmup: int = 5,
+                 warmup_max_s: float = 1.0):
         self.info = info
         self._width, self._height, self._warmup = width, height, warmup
+        self._warmup_max_s = warmup_max_s
         self._cap = None
 
     def __enter__(self) -> "Camera":
@@ -132,8 +143,16 @@ class Camera:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._cap = cap
-        for _ in range(self._warmup):
-            cap.read()
+        # Caméra « froide » (écran de connexion…) : les premières images sont mal
+        # exposées et trompent la détection du vivant. On attend une luminosité stable.
+        levels: list[float] = []
+        deadline = time.monotonic() + self._warmup_max_s
+        while time.monotonic() < deadline:
+            ok, frame = cap.read()
+            if ok and frame is not None:
+                levels.append(float(frame[::16, ::16].mean()))
+            if exposure_settled(levels, self._warmup):
+                break
         return self
 
     def __exit__(self, *exc) -> None:
