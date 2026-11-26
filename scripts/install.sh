@@ -19,7 +19,7 @@ say "1/7 Dépendances système"
 # un paquet sans votre accord. Sur une distribution en mise à jour continue (Kali,
 # Debian testing…), installer un seul paquet peut entraîner la mise à jour de
 # centaines d'autres : dans ce cas, l'installation s'arrête et vous laisse décider.
-PKGS="python3 python3-venv python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 libpam0g-dev gcc make curl ca-certificates"
+PKGS="python3 python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libpam0g-dev gcc make curl ca-certificates"
 MISSING=""
 for p in $PKGS; do
     dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" || MISSING="$MISSING $p"
