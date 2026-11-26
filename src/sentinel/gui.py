@@ -75,6 +75,9 @@ class ServiceBackend:
     def remove(self, password: str) -> dict:
         return self.client.call("remove", password=password)
 
+    def set_uses(self, password: str, uses: dict) -> dict:
+        return self.client.call("set_uses", password=password, uses=uses)
+
 
 class DemoBackend:
     """Parcours simulé, sans service ni caméra : démonstration et captures d'écran."""
@@ -116,6 +119,9 @@ class DemoBackend:
 
     def remove(self, password: str) -> dict:
         return {"ok": True, "removed": True}
+
+    def set_uses(self, password: str, uses: dict) -> dict:
+        return {"ok": bool(password), "uses": uses, "message": "mot de passe incorrect"}
 
 
 def in_thread(work, done) -> None:
@@ -316,6 +322,7 @@ class Wizard(Adw.ApplicationWindow):
         self.backend = None
         self.snapshot_dir = snapshot_dir
         self.cancelled = False
+        self.settings_mode = False
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT, vexpand=True)
         self.view = window_layout(self, self.stack)
@@ -352,6 +359,10 @@ class Wizard(Adw.ApplicationWindow):
         self.start_button.add_css_class("pill")
         self.start_button.connect("clicked", lambda *_: self._start_capture())
         box.append(self.start_button)
+        self.settings_button = Gtk.Button(label="Modifier mes réglages", halign=Gtk.Align.CENTER, visible=False)
+        self.settings_button.add_css_class("flat")
+        self.settings_button.connect("clicked", lambda *_: self._open_settings())
+        box.append(self.settings_button)
         self.remove_button = Gtk.Button(label="Supprimer mon visage", halign=Gtk.Align.CENTER, visible=False)
         self.remove_button.add_css_class("destructive-action")
         self.remove_button.add_css_class("flat")
@@ -414,14 +425,16 @@ class Wizard(Adw.ApplicationWindow):
         self.use_sudo = SwitchRow("Commandes administrateur", "sudo, dans le terminal", active=True)
         self.use_lock = SwitchRow("Écran de verrouillage", "Déverrouiller la session déjà ouverte", active=True)
         self.use_login = SwitchRow("Connexion au démarrage",
-                                   "Au démarrage, votre mot de passe reste demandé : "
-                                   "il déverrouille aussi votre trousseau de mots de passe.", sensitive=False)
+                                   "Le PC s'ouvre avec votre visage dès le démarrage. Votre mot de passe "
+                                   "est alors conservé chiffré sur ce PC, uniquement pour ouvrir votre "
+                                   "trousseau de mots de passe. Pratique, mais un PC volé s'ouvrirait "
+                                   "devant votre visage.", active=False)
         for row in (self.use_sudo, self.use_lock, self.use_login):
             uses.add(row.row)
         box.append(uses)
-        confirm = Adw.PreferencesGroup(title="Confirmation",
-                                       description="Saisissez votre mot de passe pour autoriser "
-                                                   "l'enregistrement de votre visage.")
+        self.confirm_group = confirm = Adw.PreferencesGroup(
+            title="Confirmation",
+            description="Saisissez votre mot de passe pour autoriser l'enregistrement de votre visage.")
         self.password = PasswordRow("Mot de passe", self._commit)
         confirm.add(self.password.row)
         box.append(confirm)
@@ -500,12 +513,17 @@ class Wizard(Adw.ApplicationWindow):
             self.start_button.set_label("Remplacer mon visage" if enrolled else "Commencer")
             self.start_button.set_sensitive(True)
             self.remove_button.set_visible(bool(enrolled))
+            self.settings_button.set_visible(bool(enrolled))
             uses = status.get("uses", {})
             self.use_sudo.set_active(uses.get("sudo", True))
             self.use_lock.set_active(uses.get("lockscreen", True))
+            self.use_login.set_active(uses.get("login", False))
         in_thread(work, done)
 
     def _start_capture(self) -> None:
+        self.settings_mode = False
+        self.confirm_group.set_description(
+            "Saisissez votre mot de passe pour autoriser l'enregistrement de votre visage.")
         self.cancelled = False
         self.ring.set_progress(0)
         self.arrow.set_label("")
@@ -578,7 +596,8 @@ class Wizard(Adw.ApplicationWindow):
 
     def _commit(self) -> None:
         password = self.password.get_text()
-        uses = {"sudo": self.use_sudo.get_active(), "lockscreen": self.use_lock.get_active(), "login": False}
+        uses = {"sudo": self.use_sudo.get_active(), "lockscreen": self.use_lock.get_active(),
+                "login": self.use_login.get_active()}
         self.finish_button.set_sensitive(False)
         self.confirm_error.set_label("")
 
@@ -591,7 +610,14 @@ class Wizard(Adw.ApplicationWindow):
                 self._show("done")
             else:
                 self.confirm_error.set_label(result.get("message", "Échec"))
-        in_thread(lambda: self.backend.commit(password, uses), done)
+        action = self.backend.set_uses if self.settings_mode else self.backend.commit
+        in_thread(lambda: action(password, uses), done)
+
+    def _open_settings(self) -> None:
+        """Modifier les usages sans refaire l'enregistrement du visage."""
+        self.settings_mode = True
+        self.confirm_group.set_description("Saisissez votre mot de passe pour enregistrer ces réglages.")
+        self._show("confirm")
 
     def _cancel(self) -> None:
         self.cancelled = True
