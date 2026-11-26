@@ -30,7 +30,10 @@ def built(tmp_path_factory):
     for f in ("pam_sentinel.c", "pam_harness.c", "Makefile"):
         shutil.copy(ROOT / "pam" / f, out / f)
     subprocess.run(["make", "-s", "-C", str(out), "all", "harness"], check=True)
-    return out
+    yield out
+    # Des exécutables laissés dans /tmp déclenchent les alertes des détecteurs de
+    # rootkits (chkrootkit : « possible Linux.Xor.DDoS ») : on les efface.
+    shutil.rmtree(out, ignore_errors=True)
 
 
 class FakeService:
