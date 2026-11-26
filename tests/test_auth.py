@@ -153,27 +153,3 @@ def test_abandon_si_trop_sombre():
 def test_interruption_a_la_demande():
     r = engine().authenticate([Scene(ME)] * 50, T, should_abort=lambda: True)
     assert r.status is Status.SKIPPED and r.frames == 1
-
-
-def test_presence_regard_indiscret():
-    class Two:
-        def detect(self, s):
-            return [face(), face()] if s.who is not None else []
-
-    class Rec:
-        def __init__(self):
-            self.n = 0
-
-        def embed(self, s, f):
-            self.n += 1
-            return ME if self.n % 2 else OTHER  # le premier visage est l'utilisateur
-
-    e = engine()
-    e.detector, e.recognizer = Two(), Rec()
-    r = e.presence([Scene(ME)] * 3, T)
-    assert r["owner"] and r["faces"] == 2 and r["strangers"] == 1
-
-
-def test_presence_personne():
-    r = engine().presence([Scene(None)] * 3, T)
-    assert not r["owner"] and r["faces"] == 0

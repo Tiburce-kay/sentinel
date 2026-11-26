@@ -102,130 +102,11 @@ function keyButton(prompt) {
     return button;
 }
 
-// --- Protection en votre absence (session ouverte uniquement) ----------------------
-//
-// Verrouillage automatique : quand le PC est inactif depuis IDLE_MS, une courte
-// vérification de présence a lieu toutes les ABSENT_EVERY_S secondes ; après deux
-// absences d'affilée, l'écran est verrouillé. Tant que l'utilisateur est devant
-// l'écran (par exemple devant une vidéo), rien ne se passe.
-// Regard indiscret : pendant l'utilisation, une vérification toutes les WATCH_EVERY_S
-// secondes ; si un autre visage apparaît à côté du sien, une notification s'affiche
-// (au plus une toutes les NOTIFY_COOLDOWN_S secondes).
-// Chaque option est activée par l'utilisateur dans l'assistant ; sinon, la caméra
-// n'est jamais sollicitée.
-
-const IDLE_MS = 60 * 1000;
-const ABSENT_EVERY_S = 20;
-const WATCH_EVERY_S = 45;
-const NOTIFY_COOLDOWN_S = 300;
-const TICK_S = 5;
-const USES_REFRESH_S = 120;
-
-function callSentinel(request) {
-    return new Promise((resolve, reject) => {
-        const client = new Gio.SocketClient({timeout: 10});
-        client.connect_async(Gio.UnixSocketAddress.new(SOCKET_PATH), null, (c, res) => {
-            let conn;
-            try {
-                conn = c.connect_finish(res);
-                const bytes = new GLib.Bytes(new TextEncoder().encode(`${JSON.stringify(request)}\n`));
-                conn.get_output_stream().write_bytes(bytes, null);
-                const input = new Gio.DataInputStream({base_stream: conn.get_input_stream()});
-                input.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, r) => {
-                    try {
-                        const [line] = s.read_line_finish_utf8(r);
-                        resolve(line ? JSON.parse(line) : {});
-                    } catch (e) {
-                        reject(e);
-                    } finally {
-                        conn.close_async(GLib.PRIORITY_DEFAULT, null, null);
-                    }
-                });
-            } catch (e) {
-                conn?.close_async(GLib.PRIORITY_DEFAULT, null, null);
-                reject(e);
-            }
-        });
-    });
-}
-
-class PresenceGuard {
-    constructor() {
-        this._uses = {};
-        this._absent = 0;
-        this._checking = false;
-        this._lastAbsentCheck = 0;
-        this._lastWatch = 0;
-        this._lastNotify = -NOTIFY_COOLDOWN_S;
-        this._lastUses = -USES_REFRESH_S;
-        this._idle = global.backend.get_core_idle_monitor();
-        this._tick = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, TICK_S, () => {
-            this._onTick().catch(e => logError(e, 'Sentinel'));
-            return GLib.SOURCE_CONTINUE;
-        });
-    }
-
-    destroy() {
-        if (this._tick)
-            GLib.source_remove(this._tick);
-        this._tick = 0;
-    }
-
-    async _onTick() {
-        if (this._checking || Main.sessionMode.isLocked || Main.sessionMode.currentMode !== 'user')
-            return;
-        const now = GLib.get_monotonic_time() / 1e6;
-        this._checking = true;
-        try {
-            if (now - this._lastUses >= USES_REFRESH_S) {
-                this._lastUses = now;
-                const status = await callSentinel({op: 'status'});
-                this._uses = status.ok ? status.uses ?? {} : {};
-            }
-            const idle = this._idle.get_idletime() >= IDLE_MS;
-            if (!idle)
-                this._absent = 0;
-            if (this._uses.autolock && idle && now - this._lastAbsentCheck >= ABSENT_EVERY_S) {
-                this._lastAbsentCheck = now;
-                const p = await callSentinel({op: 'presence'});
-                if (p.ok) {
-                    this._absent = p.owner ? 0 : this._absent + 1;
-                    if (this._absent >= 2) {
-                        this._absent = 0;
-                        console.log('Sentinel : utilisateur absent, verrouillage');
-                        Main.screenShield.lock(true);
-                    }
-                }
-            } else if (this._uses.watch && !idle && now - this._lastWatch >= WATCH_EVERY_S) {
-                this._lastWatch = now;
-                const p = await callSentinel({op: 'presence'});
-                if (p.ok && p.owner && p.strangers > 0 && now - this._lastNotify >= NOTIFY_COOLDOWN_S) {
-                    this._lastNotify = now;
-                    Main.notify('Sentinel', 'Quelqu’un d’autre semble regarder votre écran.');
-                }
-            }
-        } catch (e) {
-            // Service arrêté, caméra occupée… : on réessaiera au prochain tour.
-        } finally {
-            this._checking = false;
-        }
-    }
-}
-
 export default class SentinelExtension extends Extension {
     enable() {
         // Une ligne au journal : savoir si l'extension est active, notamment à l'écran
         // de connexion, où rien d'autre n'est visible.
         console.log(`Sentinel : extension active (mode ${Main.sessionMode.currentMode})`);
-        // Protection en votre absence : seulement dans la session ouverte (le mode
-        // « gdm » de l'écran de connexion n'a pas d'utilisateur à protéger).
-        if (Main.sessionMode.currentMode !== 'gdm' && !this._guard) {
-            try {
-                this._guard = new PresenceGuard();
-            } catch (e) {
-                logError(e, 'Sentinel');
-            }
-        }
         this._injections = new InjectionManager();
         const proto = AuthPrompt.AuthPrompt.prototype;
 
@@ -307,8 +188,6 @@ export default class SentinelExtension extends Extension {
     }
 
     disable() {
-        this._guard?.destroy();
-        this._guard = null;
         this._injections?.clear();
         this._injections = null;
     }

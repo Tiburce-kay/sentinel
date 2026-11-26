@@ -130,32 +130,6 @@ class Engine:
                 return Status.SUCCESS
         return Status.CHALLENGE_FAILED
 
-    def presence(self, frames: Iterable[np.ndarray], templates: np.ndarray, max_faces: int = 3) -> dict:
-        """Qui est devant l'écran ? Pour le verrouillage automatique et l'alerte de
-        regard indiscret. Pas d'authentification ici (rien n'est déverrouillé) : ni
-        détection du vivant, ni défi. Renvoie uniquement des comptes, aucune image.
-
-        owner     l'utilisateur a été reconnu sur au moins une image
-        faces     nombre maximal de visages vus simultanément
-        strangers nombre maximal de visages NON reconnus vus en même temps que lui
-                  (personne qui regarde par-dessus l'épaule)"""
-        thr = self.cfg.recognition.threshold
-        out = {"owner": False, "faces": 0, "strangers": 0, "frames": 0}
-        for frame in frames:
-            out["frames"] += 1
-            faces = sorted(self.detector.detect(frame), key=lambda f: f.area, reverse=True)[:max_faces]
-            out["faces"] = max(out["faces"], len(faces))
-            owner_here, strangers = False, 0
-            for face in faces:
-                if best_similarity(self.recognizer.embed(frame, face), templates) >= thr:
-                    owner_here = True
-                else:
-                    strangers += 1
-            out["owner"] |= owner_here
-            if owner_here:
-                out["strangers"] = max(out["strangers"], strangers)
-        return out
-
     def _turned(self, face: Face, ref: Pose | None) -> bool:
         """Tête nettement tournée par rapport à la position de face de l'utilisateur."""
         p = Pose.of(landmarks(face.raw))

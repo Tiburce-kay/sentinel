@@ -308,27 +308,6 @@ class Handler(socketserver.StreamRequestHandler):
                 reply["authtok"] = secret
         self.send(reply)
 
-    def op_presence(self, req: dict) -> None:
-        """Présence devant l'écran (verrouillage automatique, regard indiscret).
-        Pour soi-même, depuis une session active devant la machine, et seulement si
-        l'utilisateur a activé l'une de ces protections."""
-        user = self._user(req, allow_other_if_root=False)
-        self._require_local()
-        st, cfg = self.state, self.state.cfg
-        enr = st.store.load(user)
-        if enr is None:
-            raise Refused("not_enrolled", Status.NOT_ENROLLED.value)
-        if not (enr.uses.get("autolock") or enr.uses.get("watch")):
-            raise Refused("disabled", "protection en votre absence non activée")
-        if not st.camera_lock.acquire(blocking=False):
-            raise Refused("busy", "caméra déjà utilisée par Sentinel")
-        try:
-            with st.open_camera() as cam:
-                out = st.get_engine().presence(cam.frames(cfg.presence.duration_s), enr.embeddings)
-        finally:
-            st.camera_lock.release()
-        self.send({"ok": True, **out})
-
     def op_skip(self, req: dict) -> None:
         """« Passer au mot de passe » (bouton clé). À l'écran de connexion, la demande
         vient de GDM (compte système) pour l'utilisateur choisi : autorisée pour tout

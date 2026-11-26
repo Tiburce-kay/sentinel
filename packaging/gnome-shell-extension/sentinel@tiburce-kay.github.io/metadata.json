@@ -1,7 +1,7 @@
 {
   "uuid": "sentinel@tiburce-kay.github.io",
   "name": "Sentinel",
-  "description": "Écrans de connexion et de verrouillage : champ du mot de passe masqué pendant la reconnaissance faciale, bouton clé. Session : verrouillage quand vous vous éloignez, alerte de regard indiscret (options).",
+  "description": "Écrans de connexion et de verrouillage : champ du mot de passe masqué pendant la reconnaissance faciale Sentinel, bouton clé pour passer au mot de passe.",
   "shell-version": [
     "45",
     "46",
@@ -17,5 +17,5 @@
     "gdm"
   ],
   "url": "https://github.com/Tiburce-kay/sentinel",
-  "version": 5
+  "version": 6
 }
