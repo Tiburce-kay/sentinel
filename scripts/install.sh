@@ -144,6 +144,16 @@ protect_key() {
         MODE=tpm2+host; LABEL="puce TPM 2.0 + secret du système"
     else
         MODE=host; LABEL="secret du système (pas de puce TPM 2.0 utilisable)"
+        # Puce TPM 2.0 présente mais bibliothèques absentes (installation minimale) :
+        # on le signale, sans rien installer d'office.
+        if systemd-analyze has-tpm2 2>/dev/null | grep -q "^+firmware" && \
+           systemd-analyze has-tpm2 2>/dev/null | grep -q "^-libraries"; then
+            echo "Une puce TPM 2.0 est présente, mais ses bibliothèques manquent. Pour l'utiliser :"
+            echo "  sudo apt install tpm2-tools   puis relancez cet installateur."
+        elif [ "$(cat /sys/class/tpm/tpm0/tpm_version_major 2>/dev/null)" = "1" ]; then
+            echo "Puce TPM 1.2 détectée : si le BIOS propose une TPM 2.0 (ex. Intel PTT, AMD fTPM),"
+            echo "l'activer puis relancer cet installateur scellera la clé dans la puce."
+        fi
     fi
     if [ -f "$CRED" ] && [ -f "$DROPIN" ] && [ "$(cat "$MARK" 2>/dev/null)" = "$MODE" ] && [ ! -f "$KEY" ]; then
         echo "clé déjà protégée : $LABEL"

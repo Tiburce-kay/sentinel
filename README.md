@@ -29,6 +29,8 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 - **Modèles d'IA vérifiés** par SHA-256 avant chargement.
 - **Clé de chiffrement scellée dans la puce TPM 2.0** (coffre `systemd-creds`) : une copie
   du disque ne permet pas de la déchiffrer sur une autre machine. Validé sur matériel réel.
+  Choisie automatiquement à l'installation : TPM 2.0 si disponible, sinon secret du système
+  (systemd ≥ 250), sinon fichier root (Ubuntu 22.04).
 - **Licences compatibles avec un usage commercial** (MIT, Apache-2.0).
 
 ## Installation (Debian, Ubuntu, Kali)
