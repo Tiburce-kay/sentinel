@@ -1,4 +1,8 @@
 # Sentinel : extension de l'écran de connexion (champ du mot de passe masqué pendant
 # la reconnaissance faciale, bouton « Utiliser le mot de passe »).
+# Les trois clés sont verrouillées (voir locks/95-sentinel) : la base de réglages
+# propre à l'écran de connexion (GDM 49+) ne peut pas les remplacer.
 [org/gnome/shell]
 enabled-extensions=['sentinel@tiburce-kay.github.io']
+disabled-extensions=@as []
+disable-user-extensions=false

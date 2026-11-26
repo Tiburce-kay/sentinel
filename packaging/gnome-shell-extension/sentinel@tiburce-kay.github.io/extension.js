@@ -16,6 +16,7 @@ import GLib from 'gi://GLib';
 import St from 'gi://St';
 import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as AuthPrompt from 'resource:///org/gnome/shell/gdm/authPrompt.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const SOCKET_PATH = '/run/sentinel/sentinel.sock';
 const CAMERA_MESSAGE = 'Sentinel : regardez la caméra';
@@ -103,6 +104,9 @@ function keyButton(prompt) {
 
 export default class SentinelExtension extends Extension {
     enable() {
+        // Une ligne au journal : savoir si l'extension est active, notamment à l'écran
+        // de connexion, où rien d'autre n'est visible.
+        console.log(`Sentinel : extension active (mode ${Main.sessionMode.currentMode})`);
         this._injections = new InjectionManager();
         const proto = AuthPrompt.AuthPrompt.prototype;
 
