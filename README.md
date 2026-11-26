@@ -27,6 +27,8 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
   liées au compte : un gabarit déplacé, modifié ou fabriqué ailleurs est refusé.
 - **Caméra vérifiée** : caméras virtuelles refusées, identité de la webcam épinglée.
 - **Modèles d'IA vérifiés** par SHA-256 avant chargement.
+- **Clé de chiffrement scellée dans la puce TPM 2.0** (coffre `systemd-creds`) : une copie
+  du disque ne permet pas de la déchiffrer sur une autre machine. Validé sur matériel réel.
 - **Licences compatibles avec un usage commercial** (MIT, Apache-2.0).
 
 ## Installation (Debian, Ubuntu, Kali)
