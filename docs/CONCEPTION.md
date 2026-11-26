@@ -93,9 +93,14 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 
 ### Limites assumées
 
-- **Un attaquant déjà root** peut lire la clé et fabriquer un gabarit. C'est vrai de
-  tout système qui garde sa clé sur le disque, y compris Windows Hello sans ESS.
-  Prochaine étape : sceller la clé dans la **puce TPM 2.0** du ThinkPad.
+- **Un attaquant déjà root** sur la machine allumée peut obtenir la clé (il peut faire
+  ce que fait le service). C'est vrai aussi de Windows Hello sans ESS.
+- **Clé protégée par le coffre de systemd** (`systemd-creds`, `LoadCredentialEncrypted`) :
+  plus de clé en clair à côté des gabarits. Avec une puce **TPM 2.0**, elle est scellée
+  dans la puce (sans lien avec l'état du démarrage, pour survivre aux mises à jour du
+  BIOS) : une copie complète du disque ne suffit pas à la déchiffrer ailleurs. Sans TPM
+  2.0 (cas du T570 en TPM 1.2), elle est liée au secret du système
+  (`/var/lib/systemd/credential.secret`). Avant systemd 250 : fichier root 0600.
 - **Un jumeau ou un masque 3D réaliste** : hors de portée d'une webcam RGB seule.
   La biométrie faciale reste un facteur de **confort**, pas un remplaçant du mot de
   passe pour les comptes les plus sensibles.
@@ -137,4 +142,4 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 4a | Visage dès le démarrage (option) + trousseau ouvert automatiquement ; abandon immédiat si trop sombre / aucun visage ; extension GNOME (écrans de connexion et de verrouillage) : champ du mot de passe masqué pendant la vérification, bouton « utiliser le mot de passe » | ✔ en usage réel sur le T570 (26/11) |
 | 4b | Verrouillage automatique en cas d'absence, alerte de regard indiscret | abandonné : le système verrouille déjà après inactivité, et une alerte instantanée exigerait la caméra allumée en permanence |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
-| 6 | Clé scellée dans le TPM, mise à jour adaptative des gabarits | à faire |
+| 6 | Clé confiée au coffre systemd (TPM 2.0 si présente), migration vérifiée ; mise à jour adaptative des gabarits | coffre ✔ (à installer sur le T570), gabarits adaptatifs à faire |

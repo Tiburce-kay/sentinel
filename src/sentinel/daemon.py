@@ -308,6 +308,17 @@ class Handler(socketserver.StreamRequestHandler):
                 reply["authtok"] = secret
         self.send(reply)
 
+    def op_health(self, req: dict) -> None:
+        """Contrôle après installation (root) : la clé déchiffre-t-elle bien tous les
+        gabarits ? L'installateur ne supprime l'ancienne clé en clair qu'après ce test."""
+        if not self.peer.is_root:
+            raise Refused("forbidden", "réservé à root")
+        st = self.state
+        users = st.store.users()
+        for user in users:
+            st.store.load(user)  # lève une erreur si la clé ne convient pas
+        self.send({"ok": True, "users": len(users), "key": st.store.key_source})
+
     def op_skip(self, req: dict) -> None:
         """« Passer au mot de passe » (bouton clé). À l'écran de connexion, la demande
         vient de GDM (compte système) pour l'utilisateur choisi : autorisée pour tout
@@ -483,6 +494,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         state.store.check_permissions()
     state.get_engine()  # modèles chargés une fois, au démarrage
+    protection = os.environ.get("SENTINEL_KEY_PROTECTION", "")
+    log.info("clé de chiffrement : %s%s", state.store.key_source,
+             f" ({protection})" if state.store.key_source == "coffre" and protection else "")
     path = args.socket or cfg.socket_path
     import signal
 

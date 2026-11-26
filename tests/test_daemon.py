@@ -295,3 +295,13 @@ def test_nouvelles_options_activables_sur_un_ancien_enrolement(service):
     with service.client() as c:
         r = c.call("set_uses", password=PASSWORD, uses={"login": True})
     assert r["ok"] and r["uses"]["login"] is True
+
+
+def test_controle_de_sante_reserve_a_root(service, monkeypatch):
+    enroll(service)
+    with service.client() as c:
+        assert c.call("health")["status"] == "forbidden"
+    monkeypatch.setattr(d, "peer_of", lambda sock: FakePeer(os.getpid(), 0, 0))
+    with service.client() as c:
+        r = c.call("health")
+    assert r == {"ok": True, "users": 1, "key": "fichier"}

@@ -14,6 +14,8 @@ if [ -d /run/systemd/system ]; then
     systemctl disable --now sentineld >/dev/null 2>&1 || true
 fi
 rm -f /etc/systemd/system/sentineld.service
+rm -rf /etc/systemd/system/sentineld.service.d
+rm -f /etc/credstore.encrypted/sentinel-master-key /etc/credstore.encrypted/sentinel-master-key.mode
 [ -d /run/systemd/system ] && systemctl daemon-reload || true
 for d in /usr/lib/x86_64-linux-gnu/security /lib/x86_64-linux-gnu/security \
          /usr/lib/aarch64-linux-gnu/security /lib/security /usr/lib/security /usr/lib64/security; do

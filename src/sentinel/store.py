@@ -98,12 +98,26 @@ def _read_nofollow(path: Path) -> bytes:
 
 
 class TemplateStore:
-    def __init__(self, data_dir: Path, strict_permissions: bool = True):
+    CREDENTIAL_NAME = "sentinel-master-key"
+
+    def __init__(self, data_dir: Path, strict_permissions: bool = True,
+                 credentials_dir: Path | None = None):
         self.root = Path(data_dir)
         self.strict = strict_permissions
         self.users_dir = self.root / "users"
         self.state_dir = self.root / "state"
         self.key_path = self.root / "master.key"
+        # Clé fournie par le coffre de systemd (systemd-creds, LoadCredentialEncrypted) :
+        # chiffrée sur le disque, scellée dans la puce TPM 2.0 quand il y en a une, et
+        # déchiffrée par systemd au démarrage du service seulement.
+        if credentials_dir is None and os.environ.get("CREDENTIALS_DIRECTORY"):
+            credentials_dir = Path(os.environ["CREDENTIALS_DIRECTORY"])
+        self.credential_path = credentials_dir / self.CREDENTIAL_NAME if credentials_dir else None
+
+    @property
+    def key_source(self) -> str:
+        """« coffre » (systemd-creds) ou « fichier » (clé dans /var/lib/sentinel)."""
+        return "coffre" if self.credential_path is not None and self.credential_path.exists() else "fichier"
 
     # --- Initialisation et contrôles ------------------------------------------
 
@@ -111,7 +125,7 @@ class TemplateStore:
         for d in (self.root, self.users_dir, self.state_dir):
             d.mkdir(mode=0o700, parents=True, exist_ok=True)
             os.chmod(d, 0o700)
-        if not self.key_path.exists():
+        if self.key_source == "fichier" and not self.key_path.exists():
             fd = os.open(self.key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "wb") as fh:
                 fh.write(AESGCM.generate_key(bit_length=256))
@@ -136,11 +150,15 @@ class TemplateStore:
             raise StoreError(f"{self.root} n'existe pas : lancer « sentinel init »")
         for d in (self.root, self.users_dir, self.state_dir):
             self._check(d, is_dir=True)
-        self._check(self.key_path, is_dir=False)
+        if self.key_source == "fichier":
+            self._check(self.key_path, is_dir=False)
 
     def _key(self) -> bytes:
-        self._check(self.key_path, is_dir=False)
-        key = _read_nofollow(self.key_path)
+        if self.key_source == "coffre":
+            key = self.credential_path.read_bytes()  # répertoire géré par systemd (root, 0400)
+        else:
+            self._check(self.key_path, is_dir=False)
+            key = _read_nofollow(self.key_path)
         if len(key) != 32:
             raise StoreError("clé de chiffrement invalide")
         return key

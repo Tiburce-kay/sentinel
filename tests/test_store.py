@@ -146,3 +146,34 @@ def test_suppression_du_visage_efface_le_secret(store):
     store.save_secret("alice", "x")
     store.remove("alice")
     assert store.load_secret("alice") is None
+
+
+def test_cle_fournie_par_le_coffre_systemd(tmp_path):
+    """Avec LoadCredentialEncrypted, systemd fournit la clé : aucun fichier de clé en clair."""
+    import os as _os
+    cred = tmp_path / "creds"
+    cred.mkdir()
+    key = _os.urandom(32)
+    (cred / "sentinel-master-key").write_bytes(key)
+    s = TemplateStore(tmp_path / "store", strict_permissions=False, credentials_dir=cred)
+    s.init()
+    assert s.key_source == "coffre" and not s.key_path.exists()
+    s.save(Enrollment("alice", emb()))
+    assert s.load("alice") is not None
+    # La même clé, sous forme de fichier : les gabarits restent lisibles (migration).
+    s2 = TemplateStore(tmp_path / "store", strict_permissions=False)
+    s2.key_path.write_bytes(key)
+    s2.key_path.chmod(0o600)
+    assert s2.key_source == "fichier" and s2.load("alice") is not None
+
+
+def test_mauvaise_cle_du_coffre_refusee(tmp_path):
+    import os as _os
+    s = TemplateStore(tmp_path / "store", strict_permissions=False)
+    s.init()
+    s.save(Enrollment("alice", emb()))
+    cred = tmp_path / "creds"
+    cred.mkdir()
+    (cred / "sentinel-master-key").write_bytes(_os.urandom(32))
+    with pytest.raises(TamperedError):
+        TemplateStore(tmp_path / "store", strict_permissions=False, credentials_dir=cred).load("alice")
