@@ -31,9 +31,17 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 
 ## Installation (Debian, Ubuntu, Kali)
 
-Testée de bout en bout (installation, vrai `sudo`, désinstallation) sur **Kali rolling** et
-**Ubuntu 24.04** : `scripts/test-install-docker.sh [image]`. L'assistant graphique demande
-libadwaita ≥ 1.5 (Ubuntu 24.04, Debian 13, Kali).
+Testée de bout en bout dans des conteneurs vierges — installation, suite de tests complète,
+assistant graphique, vrai `sudo` avec le module PAM, désinstallation
+(`scripts/test-install-docker.sh [image]`) :
+
+| Distribution | Python | libadwaita / GTK | Résultat |
+|---|---|---|---|
+| Ubuntu 22.04 (et Mint 21, Zorin 17…) | 3.10 | 1.1 / 4.6 | ✅ |
+| Ubuntu 24.04 (et Mint 22…) | 3.12 | 1.5 / 4.14 | ✅ |
+| Debian 12 | 3.11 | 1.2 / 4.8 | ✅ |
+| Debian 13 | 3.13 | 1.7 / 4.18 | ✅ |
+| Kali rolling | 3.14 | 1.10 / 4.24 | ✅ |
 
 ```bash
 git clone <url-du-depot> sentinel && cd sentinel
