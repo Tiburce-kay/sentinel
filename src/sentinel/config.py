@@ -91,6 +91,10 @@ class AuthConfig:
     window_frames: int = 10
     # Au-delà de ces écarts à la position de face (voir geometry.Pose), l'image est
     # ignorée : le modèle de vivant n'est pas fiable de profil (essai réel du 25/11).
+    # Abandons anticipés (le mot de passe s'affiche aussitôt) : image trop sombre
+    # pendant tant de secondes, ou aucun visage depuis le début de la tentative.
+    give_up_dark_s: float = 1.0
+    give_up_no_face_s: float = 1.5
     max_yaw: float = 0.12
     max_pitch: float = 0.08
     # Après ce nombre d'échecs consécutifs, le visage est refusé jusqu'à la

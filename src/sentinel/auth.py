@@ -34,12 +34,21 @@ class LivenessLike(Protocol):
     def score(self, frame: np.ndarray, face: Face) -> float: ...
 
 
+def _brightness(frame) -> float | None:
+    """Luminosité moyenne d'une image (None pour un objet qui n'est pas une image)."""
+    if not isinstance(frame, np.ndarray) or frame.size == 0:
+        return None
+    return float(frame[::8, ::8].mean())
+
+
 class Status(enum.Enum):
     SUCCESS = "succès"
     NO_MATCH = "visage non reconnu"
     NO_FACE = "aucun visage détecté"
     TIMEOUT = "délai écoulé avant confirmation (restez face à la caméra)"
     TURNED = "tête trop tournée : regardez l'écran, de face"
+    TOO_DARK = "trop sombre : utilisez votre mot de passe"
+    SKIPPED = "passage au mot de passe"
     SPOOF = "usurpation suspectée (photo, écran ou vidéo)"
     LOCKED = "trop d'échecs : mot de passe requis"
     NOT_ENROLLED = "aucun visage enregistré"
@@ -100,7 +109,8 @@ class Engine:
 
     def authenticate(self, frames: Iterable[np.ndarray], templates: np.ndarray,
                      liveness_threshold: float | None = None,
-                     reference_pose: tuple[float, float] | None = None) -> AuthResult:
+                     reference_pose: tuple[float, float] | None = None,
+                     should_abort: Callable[[], bool] | None = None) -> AuthResult:
         """Accepte quand `window_frames` images CONSÉCUTIVES montrent chacune un visage
         de qualité, reconnu comme le bon, ET que la moyenne de leurs scores de vivant
         dépasse le seuil.
@@ -131,13 +141,33 @@ class Engine:
         ref_pose = Pose(*reference_pose) if reference_pose else None
         t_last = time.monotonic()
         try:
+            a = self.cfg.auth
+            face_seen = False
+            dark_since: float | None = None
             for frame in frames:
                 t_frame = time.monotonic()
                 result.camera_s += t_frame - t_last
                 t_last = t_frame
                 result.frames += 1
+                # Abandons anticipés : le mot de passe doit arriver vite quand le visage
+                # ne peut visiblement pas réussir (demande de l'utilisateur, noir, absence).
+                if should_abort is not None and should_abort():
+                    result.status = Status.SKIPPED
+                    break
                 face = largest(self.detector.detect(frame))
-                if face is None or not self._quality(frame, face).ok:
+                quality = self._quality(frame, face) if face is not None else None
+                dark = (quality is not None and quality.reason == "image trop sombre") or (
+                    face is None and _brightness(frame) is not None and _brightness(frame) < self.cfg.quality.min_brightness)
+                dark_since = (dark_since or t_frame) if dark else None
+                if dark_since is not None and t_frame - dark_since >= a.give_up_dark_s:
+                    result.status = Status.TOO_DARK
+                    break
+                if face is not None:
+                    face_seen = True
+                elif t_frame - start >= a.give_up_no_face_s and not face_seen:
+                    result.status = Status.NO_FACE
+                    break
+                if face is None or not quality.ok:
                     window.clear()
                     result.compute_s += time.monotonic() - t_frame
                     t_last = time.monotonic()
@@ -170,7 +200,7 @@ class Engine:
         finally:
             if pool is not None:
                 pool.shutdown(wait=True)
-        if result.status is not Status.SUCCESS:
+        if result.status not in (Status.SUCCESS, Status.SKIPPED, Status.TOO_DARK):
             partial = result.liveness_scores
             if full_window_spoof or (len(partial) >= 3 and float(np.mean(partial)) < live_t):
                 # Pas de fenêtre complète, mais les images reconnues étaient nettement

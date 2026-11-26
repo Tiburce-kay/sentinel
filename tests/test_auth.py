@@ -134,3 +134,21 @@ def test_seuil_personnel_applique_et_borne():
     # Un seuil personnel sous le plancher (-2,0) est ramené au plancher.
     r = engine().authenticate([Scene(ME, live=-2.5)] * 15, T, liveness_threshold=-9.0)
     assert not r.ok and r.liveness_threshold == -2.0
+
+
+def test_abandon_immediat_si_aucun_visage():
+    r = engine(auth__give_up_no_face_s=0.0).authenticate([Scene(None)] * 50, T)
+    assert r.status is Status.NO_FACE and r.frames == 1
+
+
+def test_abandon_si_trop_sombre():
+    dark = np.zeros((48, 64, 3), np.uint8)
+    e = engine(auth__give_up_dark_s=0.0)
+    e.detector = type("Aveugle", (), {"detect": lambda self, f: []})()  # dans le noir, aucun visage
+    r = e.authenticate([dark] * 50, T)
+    assert r.status is Status.TOO_DARK and r.frames == 1
+
+
+def test_interruption_a_la_demande():
+    r = engine().authenticate([Scene(ME)] * 50, T, should_abort=lambda: True)
+    assert r.status is Status.SKIPPED and r.frames == 1
