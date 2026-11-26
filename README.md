@@ -45,12 +45,12 @@ sudo scripts/install.sh            # service isolé, module PAM, assistant graph
 
    ```bash
    sudo -i                          # dans un AUTRE terminal, à laisser ouvert
-   sudo sentinel-pam enable sudo
+   sudo /usr/local/sbin/sentinel-pam enable sudo
    sudo -k && sudo true             # test, dans un nouveau terminal
    ```
 
 Le mot de passe reste toujours possible : en cas d'échec, de délai ou de panne, `sudo`
-le demande comme d'habitude. Désactiver : `sudo sentinel-pam disable sudo`.
+le demande comme d'habitude. Désactiver : `sudo /usr/local/sbin/sentinel-pam disable sudo`.
 Désinstaller (données de visage supprimées) : `sudo scripts/uninstall.sh`.
 
 ## Essai (mode développement)

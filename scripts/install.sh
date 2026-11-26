@@ -2,7 +2,7 @@
 # Installe Sentinel sur le système (Debian, Ubuntu, Kali et dérivées).
 #   sudo scripts/install.sh
 # N'active PAS le visage pour sudo : c'est une étape séparée et volontaire
-# (sudo sentinel-pam enable sudo), après l'enregistrement du visage.
+# (sudo /usr/local/sbin/sentinel-pam enable sudo), après l'enregistrement du visage.
 set -eu
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -113,7 +113,7 @@ cat <<'TXT'
      (ou la commande sentinel-setup).
   2. Activez le visage pour sudo, en gardant un terminal root ouvert par sécurité :
        sudo -i                       (dans un AUTRE terminal, à laisser ouvert)
-       sudo sentinel-pam enable sudo
+       sudo /usr/local/sbin/sentinel-pam enable sudo
      Puis testez dans un nouveau terminal : sudo -k && sudo true
-  Désactiver à tout moment : sudo sentinel-pam disable sudo
+  Désactiver à tout moment : sudo /usr/local/sbin/sentinel-pam disable sudo
 TXT
