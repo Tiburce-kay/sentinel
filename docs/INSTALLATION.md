@@ -56,9 +56,12 @@ sudo apt install ./sentinel_*_amd64.deb
 Le `./` est important : il indique à `apt` d'installer ce fichier plutôt que de le
 chercher sur Internet. `apt` installe aussi les quelques composants nécessaires.
 
-À la fin, `apt` peut afficher « *Le téléchargement est effectué en dehors du bac à
-sable…* ». Ce message est sans conséquence : il indique seulement que le fichier se
-trouve dans votre dossier personnel.
+Deux messages peuvent apparaître, tous deux sans conséquence :
+- « *Credential secret file … is not located on encrypted media* » : systemd signale
+  que votre disque n'est pas chiffré. La clé de Sentinel reste protégée, par la puce TPM
+  si votre PC en a une ;
+- « *Le téléchargement est effectué en dehors du bac à sable…* » : `apt` indique
+  seulement que le fichier se trouve dans votre dossier personnel.
 
 À la fin, un message indique comment la clé de chiffrement est protégée :
 
@@ -205,6 +208,7 @@ gsettings set org.gnome.shell enabled-extensions "$(gsettings get org.gnome.shel
 
 | Symptôme | Que faire |
 |---|---|
+| « visage trop loin… », « image floue… », « tête trop inclinée… » | La caméra vous voit, mais l'image n'est pas exploitable : suivez le conseil affiché, puis réessayez. |
 | « délai écoulé avant confirmation » ou « tête trop tournée » | Restez de face, immobile, une à deux secondes. |
 | `sudo` demande toujours le mot de passe | Juste après le démarrage, c'est normal : saisissez-le une fois. Sinon, ouvrez Sentinel et vérifiez que *Commandes administrateur* est activé. |
 | « trop sombre : utilisez votre mot de passe » | Allumez une lampe face à vous. La webcam ordinaire ne voit pas dans le noir. |

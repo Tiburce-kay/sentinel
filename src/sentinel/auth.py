@@ -54,6 +54,18 @@ class Status(enum.Enum):
     SPOOF = "usurpation suspectée (photo, écran ou vidéo)"
     LOCKED = "trop d'échecs : mot de passe requis"
     NOT_ENROLLED = "aucun visage enregistré"
+    POOR_IMAGE = "image du visage inexploitable"
+
+
+# Visage vu, mais aucune image exploitable : conseil selon le motif le plus fréquent.
+ADVICE = {
+    "visage trop loin ou trop petit": "visage trop loin : rapprochez-vous de la caméra",
+    "visage hors de l'image": "visage en partie hors de l'image : placez-vous face à la caméra",
+    "image surexposée": "image surexposée : évitez la lumière forte face à la caméra",
+    "image floue": "image floue : restez immobile un instant face à la caméra",
+    "tête trop inclinée": "tête trop inclinée : redressez la tête",
+    "image trop sombre": "trop sombre : utilisez votre mot de passe",
+}
 
 
 @dataclass
@@ -69,10 +81,20 @@ class AuthResult:
     camera_s: float = 0.0                 # temps passé à attendre la caméra
     compute_s: float = 0.0                # temps passé à analyser
     elapsed_s: float = 0.0
+    # Images où un visage était visible mais écarté par le contrôle de qualité, par motif.
+    rejected: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
         return self.status is Status.SUCCESS
+
+    @property
+    def message(self) -> str:
+        """Message pour l'utilisateur : précis quand l'image était inexploitable."""
+        if self.status is Status.POOR_IMAGE and self.rejected:
+            reason = max(self.rejected, key=self.rejected.get)
+            return ADVICE.get(reason, f"{Status.POOR_IMAGE.value} ({reason})")
+        return self.status.value
 
 
 @dataclass
@@ -229,6 +251,8 @@ class Engine:
                     # imposteur parti tôt compte toujours comme un échec).
                     result.status = Status.NO_FACE
                     break
+                if face is not None and not quality.ok:
+                    result.rejected[quality.reason] = result.rejected.get(quality.reason, 0) + 1
                 if face is None or not quality.ok:
                     window.clear()
                     result.compute_s += time.monotonic() - t_frame
@@ -298,6 +322,10 @@ class Engine:
                 result.status = Status.NO_MATCH
             elif result.skipped_pose:
                 result.status = Status.TURNED
+            elif result.rejected:
+                # Un visage était là, mais aucune image n'a pu être analysée : dire
+                # pourquoi (trop loin, flou…) plutôt qu'« aucun visage détecté ».
+                result.status = Status.POOR_IMAGE
         result.liveness_threshold = result_threshold
         result.elapsed_s = time.monotonic() - start
         return result

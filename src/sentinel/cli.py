@@ -147,7 +147,7 @@ def cmd_test(cfg: Config, args) -> int:
                                   enr.embeddings, enr.liveness_threshold, enr.stats.get("reference_pose"),
                                   on_challenge=lambda m: print(f"  >>> {m}", flush=True))
     lv = res.liveness_scores
-    print(f"Résultat : {res.status.value}")
+    print(f"Résultat : {res.message}")
     print(f"  similarité max {res.best_similarity:.3f} (seuil {cfg.recognition.threshold})")
     if lv:
         win = f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "fenêtre incomplète"
@@ -267,7 +267,7 @@ def cmd_campagne(cfg: Config, args) -> int:
         cp.append(csv_path, cp.Attempt(pid, tag, args.condition, args.type, res.ok, res.status.name.lower(),
                                        res.elapsed_s, res.best_similarity, res.window_liveness, res.challenge))
         verdict = "ACCEPTÉ" if res.ok else "refusé"
-        print(f"  {verdict} : {res.status.value} ({res.elapsed_s:.1f} s)")
+        print(f"  {verdict} : {res.message} ({res.elapsed_s:.1f} s)")
     print(f"\nRésultats ajoutés à {csv_path} — synthèse : sentinel campagne rapport")
     return 0
 

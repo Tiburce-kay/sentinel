@@ -166,3 +166,34 @@ def test_imposteur_parti_tot_reste_un_echec_compte():
     """Un imposteur qui se retire vite ne doit pas échapper au compteur d'échecs."""
     r = engine(auth__give_up_no_face_s=0.0).authenticate([Scene(OTHER)] * 3 + [Scene(None)] * 50, T)
     assert r.status is Status.NO_MATCH and r.frames == 4
+
+
+def _rejecting(reason):
+    from sentinel.vision import Quality
+    e = engine()
+    e.quality = lambda fr, f: Quality(False, reason)
+    return e
+
+
+def test_visage_vu_mais_image_inexploitable_le_dit_avec_un_conseil():
+    """Essai réel du 27/11 : visage présent 4 s, aucune image analysée, message
+    « aucun visage détecté » trompeur. Le motif est maintenant compté et expliqué."""
+    r = _rejecting("visage trop loin ou trop petit").authenticate([Scene(ME)] * 30, T)
+    assert r.status is Status.POOR_IMAGE and not r.ok
+    assert r.rejected == {"visage trop loin ou trop petit": 30}
+    assert r.message == "visage trop loin : rapprochez-vous de la caméra"
+
+
+def test_motif_le_plus_frequent_retenu():
+    from sentinel.vision import Quality
+    e = engine()
+    reasons = iter(["image floue"] * 5 + ["tête trop inclinée"] * 20)
+    e.quality = lambda fr, f: Quality(False, next(reasons))
+    r = e.authenticate([Scene(ME)] * 25, T)
+    assert r.message == "tête trop inclinée : redressez la tête"
+
+
+def test_image_inexploitable_ne_compte_pas_comme_echec():
+    from sentinel.auth import Status as S
+    r = _rejecting("image floue").authenticate([Scene(ME)] * 30, T)
+    assert r.status not in (S.SPOOF, S.NO_MATCH, S.CHALLENGE_FAILED)

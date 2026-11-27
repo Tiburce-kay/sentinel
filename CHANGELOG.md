@@ -3,6 +3,15 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Changé
+- **Message précis quand le visage est vu mais inexploitable.** Avant, l'utilisateur
+  lisait « aucun visage détecté » alors que la caméra le voyait. Il lit désormais le
+  motif et un conseil : « visage trop loin : rapprochez-vous de la caméra », « image
+  floue : restez immobile un instant », etc. Le journal compte les images écartées par
+  motif (`rejets=`). Observé sur un vrai PC le 27/11 : 34 images en 4 s, aucune analysée.
+
 ## [0.2.4] — 2026-11-27
 
 ### Corrigé
