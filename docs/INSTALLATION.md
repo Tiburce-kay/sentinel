@@ -20,17 +20,31 @@ utiliser le visage.
 
 ## 2. Télécharger le paquet
 
-1. Ouvrez la page des [versions publiées](https://github.com/Tiburce-kay/sentinel/releases)
-   et prenez la plus récente (marquée *Latest*).
-2. Téléchargez **`sentinel_<version>-1_amd64.deb`** et **`SHA256SUMS`** dans le même
-   dossier, par exemple `Téléchargements`.
-3. Facultatif mais recommandé, vérifiez que le fichier n'a pas été altéré :
+**Avec le navigateur :**
 
-   ```bash
-   cd ~/Téléchargements
-   sha256sum -c SHA256SUMS
-   ```
-   La réponse attendue est `sentinel_<version>-1_amd64.deb: OK`.
+1. Ouvrez la **[page de la dernière version](https://github.com/Tiburce-kay/sentinel/releases/latest)**.
+2. Descendez tout en bas de la page, jusqu'à la section **Assets**.
+3. Cliquez sur **`sentinel_<version>-1_amd64.deb`**, puis sur **`SHA256SUMS`**. Les deux
+   fichiers arrivent dans votre dossier `Téléchargements`.
+
+Sur la page d'accueil du projet, la même page s'ouvre par le lien **Releases**, dans la
+colonne de droite.
+
+**Ou dans un terminal**, ce qui télécharge toujours la dernière version :
+
+```bash
+cd ~/Téléchargements
+wget https://github.com/Tiburce-kay/sentinel/releases/latest/download/SHA256SUMS
+wget "https://github.com/Tiburce-kay/sentinel/releases/latest/download/$(cut -d' ' -f3 SHA256SUMS)"
+```
+
+**Vérifiez ensuite que le fichier n'a pas été altéré** (facultatif, mais recommandé) :
+
+```bash
+cd ~/Téléchargements
+sha256sum -c SHA256SUMS
+```
+La réponse attendue est `sentinel_<version>-1_amd64.deb: Réussi` (ou `: OK` sur un système en anglais).
 
 ## 3. Installer
 

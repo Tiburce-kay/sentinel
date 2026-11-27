@@ -55,7 +55,7 @@ part de ces faiblesses documentées ([conception](docs/CONCEPTION.md)).
 ## Installation
 
 ```bash
-# 1. Télécharger sentinel_<version>-1_amd64.deb (et SHA256SUMS) depuis les Releases
+# 1. Télécharger le paquet et SHA256SUMS : https://github.com/Tiburce-kay/sentinel/releases/latest (section « Assets »)
 sha256sum -c SHA256SUMS                    # 2. vérifier le fichier (facultatif)
 sudo apt install ./sentinel_*_amd64.deb    # 3. installer
 ```
