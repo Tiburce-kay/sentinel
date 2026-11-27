@@ -264,3 +264,19 @@ def test_sudo_secours_par_mot_de_passe(built, tmp_path, cas):
 def test_ecran_de_connexion_secours_par_mot_de_passe(built, tmp_path, cas):
     out, seen = keyring_stack(built, tmp_path, SECOURS[cas], password_ok=True)
     assert "Success" in out and seen is None
+
+
+@pytest.mark.parametrize("layout", ["sudo", "gdm-password"])
+def test_module_supprime_ligne_restee_le_mot_de_passe_marche(built, tmp_path, layout):
+    """Pire cas d'une désinstallation : le fichier pam_sentinel.so a disparu mais la
+    ligne est restée. libpam ignore le module manquant : le mot de passe fonctionne."""
+    conf = tmp_path / "conf"
+    conf.mkdir()
+    missing = tmp_path / "disparu" / "pam_sentinel.so"
+    first = ("auth sufficient" if layout == "sudo" else "auth [success=ok default=2]") + f" {missing}\n"
+    rest = "" if layout == "sudo" else "auth optional pam_permit.so\nauth [success=done default=die] pam_permit.so\n"
+    for password_ok, expected in ((True, True), (False, False)):
+        (conf / layout).write_text(first + rest + f"auth required {'pam_permit.so' if password_ok else 'pam_deny.so'}\n")
+        p = subprocess.run([str(built / "pam-harness"), str(conf), layout, "alice"],
+                           capture_output=True, text=True, timeout=15)
+        assert ("résultat PAM : Success" in p.stdout) is expected, p.stdout

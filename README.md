@@ -29,8 +29,7 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 - **Modèles d'IA vérifiés** par SHA-256 avant chargement.
 - **Clé de chiffrement scellée dans la puce TPM 2.0** (coffre `systemd-creds`) : une copie
   du disque ne permet pas de la déchiffrer sur une autre machine. Validé sur matériel réel.
-  Choisie automatiquement à l'installation : TPM 2.0 si disponible, sinon secret du système
-  (systemd ≥ 250), sinon fichier root (Ubuntu 22.04).
+  Choisie automatiquement à l'installation : TPM 2.0 si disponible, sinon secret du système.
 - **Licences compatibles avec un usage commercial** (MIT, Apache-2.0).
 
 ## Installation (Debian, Ubuntu, Kali)
@@ -43,22 +42,22 @@ famille Debian — puis double-cliquez dessus, ou :
 sudo apt install ./sentinel_0.2.2-1_amd64.deb
 ```
 
-**Configuration requise :** PC 64 bits (amd64), webcam, systemd comme système de
-démarrage, et une distribution de la famille Debian **au moins aussi récente qu'Ubuntu
-22.04 ou Debian 12**. Sur un système plus ancien ou un processeur ARM, `apt` refuse
-l'installation. Le paquet embarque son propre Python et ses bibliothèques d'IA : il ne
-dépend pas de la version de Python de la distribution.
+**Configuration requise :** une distribution de la famille Debian livrée avec **GNOME 45
+ou plus récent** — Ubuntu 24.04 et suivantes, Debian 13 et suivantes, Kali — sur un PC
+64 bits (amd64) avec webcam et systemd. Sur une version plus ancienne (Ubuntu 22.04,
+Debian 12…) ou un processeur ARM, `apt` refuse l'installation. Le paquet embarque son
+propre Python et ses bibliothèques d'IA : il ne dépend pas du Python de la distribution.
 
-Ce qui fonctionne dépend du bureau :
+| Fonction | État |
+|---|---|
+| `sudo` par le visage | ✅ testé automatiquement sur Ubuntu 24.04, Debian 13 et Kali |
+| Écran de verrouillage et connexion au démarrage, champ du mot de passe masqué, bouton clé | ✅ essayé sur un vrai PC (Kali, GNOME 49) ; mêmes GDM et PAM sur les autres |
+| Clé de chiffrement scellée dans la puce TPM 2.0 | ✅ si le PC en a une (sinon fichier réservé à root) |
 
-| Système | `sudo` | Écran de verrouillage et connexion | Champ du mot de passe masqué, bouton clé | Clé dans la puce TPM |
-|---|---|---|---|---|
-| Ubuntu 24.04+, Debian 13, Kali — GNOME 45 et plus | ✅ | ✅ | ✅ | ✅ si TPM 2.0 |
-| Ubuntu 22.04, Debian 12, Zorin 17 — GNOME 42 à 44 | ✅ | ✅ | ❌ champ visible pendant la vérification | Debian 12 ✅ ; Ubuntu 22.04 ❌ (systemd 249 : clé dans un fichier réservé à root) |
-| Linux Mint, Xfce, KDE, COSMIC — autre écran de connexion que GDM | ✅ | ❌ (options grisées dans l'assistant) | — | selon la base |
-
+Sur une de ces distributions avec un autre bureau que GNOME (KDE, Xfce, Cinnamon…),
+seul `sudo` fonctionne : l'assistant grise les options d'écran et explique pourquoi.
 Dans tous les cas, le mot de passe reste utilisable : webcam absente ou en panne, pièce
-sombre, visage non reconnu, service arrêté.
+sombre, visage non reconnu, service arrêté, Sentinel désinstallé.
 
 Lancez ensuite **Sentinel** depuis le menu des applications : l'assistant enregistre votre
 visage, puis active la reconnaissance pour `sudo` et l'écran de connexion (mot de passe

@@ -195,7 +195,7 @@ class Engine:
         try:
             a = self.cfg.auth
             frames = iter(frames)  # la phase de défi reprend le même flux d'images
-            face_seen = False
+            last_face_t = start  # dernier instant où un visage était visible
             challenge_ref = None   # points du visage de face, si un défi est nécessaire
             gray_pts = None        # dernière fenêtre en zone grise sous le seuil
             last_pts = None
@@ -221,8 +221,12 @@ class Engine:
                     result.status = Status.TOO_DARK
                     break
                 if face is not None:
-                    face_seen = True
-                elif t_frame - start >= a.give_up_no_face_s and not face_seen:
+                    last_face_t = t_frame
+                elif t_frame - last_face_t >= a.give_up_no_face_s:
+                    # Personne devant la caméra depuis give_up_no_face_s (dès le début,
+                    # ou après le départ d'un visage) : inutile d'attendre la fin du délai.
+                    # Le statut final reste établi plus bas sur ce qui a été vu (un
+                    # imposteur parti tôt compte toujours comme un échec).
                     result.status = Status.NO_FACE
                     break
                 if face is None or not quality.ok:

@@ -153,3 +153,16 @@ def test_abandon_si_trop_sombre():
 def test_interruption_a_la_demande():
     r = engine().authenticate([Scene(ME)] * 50, T, should_abort=lambda: True)
     assert r.status is Status.SKIPPED and r.frames == 1
+
+
+def test_abandon_quand_le_visage_s_en_va():
+    """Quelqu'un passe devant la caméra puis s'en va : abandon sans attendre le délai."""
+    r = engine(auth__give_up_no_face_s=0.0).authenticate([Scene(ME)] * 3 + [Scene(None)] * 50, T)
+    assert r.frames == 4 and not r.ok
+    assert r.status is Status.TIMEOUT  # le bon visage, mais trop bref : simple délai
+
+
+def test_imposteur_parti_tot_reste_un_echec_compte():
+    """Un imposteur qui se retire vite ne doit pas échapper au compteur d'échecs."""
+    r = engine(auth__give_up_no_face_s=0.0).authenticate([Scene(OTHER)] * 3 + [Scene(None)] * 50, T)
+    assert r.status is Status.NO_MATCH and r.frames == 4

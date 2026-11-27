@@ -267,6 +267,7 @@ class Handler(socketserver.StreamRequestHandler):
         if use != "test" and st.password_required(user, enr):
             raise Refused("password_required", "mot de passe requis (premier déverrouillage)")
         if st.store.failures(user) >= cfg.auth.max_failures:
+            log.warning("tentative sur visage verrouillé user=%s service=%s", user, service)
             raise Refused("locked", Status.LOCKED.value)
         if not st.camera_lock.acquire(blocking=False):
             raise Refused("busy", "caméra déjà utilisée par Sentinel")
@@ -293,7 +294,14 @@ class Handler(socketserver.StreamRequestHandler):
         if res.ok:
             st.store.set_failures(user, 0)
         elif res.status in (Status.SPOOF, Status.NO_MATCH, Status.CHALLENGE_FAILED):
-            st.store.set_failures(user, st.store.failures(user) + 1)
+            count = st.store.failures(user) + 1
+            st.store.set_failures(user, count)
+            # Niveau « avertissement » : journalctl -u sentineld -p warning les isole.
+            log.warning("tentative refusée user=%s service=%s motif=%s échecs=%d/%d", user, service,
+                        res.status.name, count, cfg.auth.max_failures)
+            if count >= cfg.auth.max_failures:
+                log.warning("visage verrouillé user=%s : mot de passe exigé jusqu'à la prochaine "
+                            "saisie correcte", user)
         lv = res.liveness_scores
         # Mesures numériques uniquement (aucune image) : comprendre un refus a posteriori.
         log.info("authentification user=%s service=%s résultat=%s durée=%.2fs images=%d ignorées=%d "

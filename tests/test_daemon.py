@@ -124,7 +124,9 @@ def test_limitation_des_essais_de_mot_de_passe(service):
         assert c.call("enroll_commit", password=PASSWORD)["status"] == "rate_limited"
 
 
-def test_photo_refusee_puis_verrouillage(service):
+def test_photo_refusee_puis_verrouillage(service, caplog):
+    import logging
+    caplog.set_level(logging.WARNING, logger="sentineld")
     enroll(service)
     service.scenes = [Shot(ME, -6.0)] * 20
     with service.client() as c:
@@ -132,6 +134,11 @@ def test_photo_refusee_puis_verrouillage(service):
             assert c.call("authenticate", service="sudo")["status"] == "spoof"
         service.scenes = [Shot(ME, 1.0)] * 20
         assert c.call("authenticate", service="sudo")["status"] == "locked"
+        # Chaque tentative refusée est journalisée, puis le verrouillage.
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert sum("tentative refusée" in w and "motif=SPOOF" in w for w in warnings) == service.cfg.auth.max_failures
+        assert any("visage verrouillé" in w for w in warnings)
+        assert any("tentative sur visage verrouillé" in w and "service=sudo" in w for w in warnings)
         # Seul root (PAM, après un mot de passe correct) peut lever le verrou.
         assert c.call("password_ok", user=c.call("hello")["user"])["status"] == "forbidden"
 
@@ -320,3 +327,28 @@ def test_gabarit_illisible_signale_sans_bloquer(service):
     with service.client() as c:
         st = c.call("status")
     assert st["enrolled"] and not st["damaged"]
+
+
+def test_deux_comptes_chacun_son_visage(service, monkeypatch):
+    """PC partagé : le module PAM (root) demande le visage du compte qui lance sudo.
+    Le frère non enregistré passe au mot de passe ; une fois enregistré, seul SON
+    visage ouvre SON compte, et le visage d'alice n'ouvre pas le sien (ni l'inverse)."""
+    import numpy as np
+    from sentinel.store import Enrollment
+    enroll(service)                                   # alice : visage ME
+    as_root(service, monkeypatch)
+    service.scenes = [Shot(ME, 1.0)] * 20
+    with service.client() as c:
+        assert c.call("authenticate", user="frere", service="sudo")["status"] == "not_enrolled"
+    alice = service.store.load("alice")
+    service.store.save(Enrollment(user="frere", embeddings=np.stack([OTHER]).astype(np.float32),
+                                  camera=alice.camera, liveness_threshold=alice.liveness_threshold,
+                                  stats=alice.stats))
+    with service.client() as c:
+        assert c.call("authenticate", user="frere", service="sudo")["status"] == "no_match"  # visage d'alice
+        assert c.call("authenticate", user="alice", service="sudo")["ok"]
+        service.scenes = [Shot(OTHER, 1.0)] * 20
+        assert c.call("authenticate", user="frere", service="sudo")["ok"]
+        assert c.call("authenticate", user="alice", service="sudo")["status"] == "no_match"  # visage du frère
+    # Les échecs sont comptés séparément pour chaque compte.
+    assert service.store.failures("frere") == 0 and service.store.failures("alice") == 1

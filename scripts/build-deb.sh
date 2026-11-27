@@ -1,21 +1,22 @@
 #!/bin/sh
-# Fabrique LE paquet .deb de Sentinel, unique pour toute la famille Debian (Debian 12+,
-# Ubuntu 22.04+, Kali, Mint, Zorin…), dans un conteneur jetable.
+# Fabrique LE paquet .deb de Sentinel, unique pour les distributions de la famille
+# Debian livrées avec GNOME 45 ou plus récent (Ubuntu 24.04+, Debian 13+, Kali…),
+# dans un conteneur jetable.
 #
-#   scripts/build-deb.sh            -> dist/sentinel_0.2.2-1_amd64.deb
+#   scripts/build-deb.sh            -> dist/sentinel_<version>-1_amd64.deb
 #
 # Le service embarque son propre Python (version autonome, épinglée par son empreinte
-# SHA-256) et ses bibliothèques d'IA : il ne dépend pas de la version de Python de la
-# distribution. Le paquet est fabriqué sur la plus ANCIENNE distribution prise en
-# charge (Ubuntu 22.04, glibc 2.35) : le module PAM compilé fonctionne aussi sur les
-# plus récentes, et le paquet déclare cette version minimale (libc6 >= 2.35), si bien
-# qu'apt refuse de l'installer sur un système plus ancien.
+# SHA-256) et ses bibliothèques d'IA : il ne dépend pas du Python de la distribution.
+# Fabriqué sur la plus ANCIENNE distribution prise en charge (Ubuntu 24.04, glibc
+# 2.39). Le paquet déclare ce minimum (libc6 >= 2.39) et refuse les GNOME antérieurs
+# à 45 (Breaks: gnome-shell << 45) : apt refuse de l'installer sur Ubuntu 22.04,
+# Debian 12 ou plus ancien.
 set -eu
 
-BUILDER=ubuntu:22.04
+BUILDER=ubuntu:24.04
 PY_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.12.16%2B20261124-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 PY_SHA256=7e1adaea26c959d13aa1120be1ae62a1ea1bb52adcb382679fffe9217e22adff
-MIN_GLIBC=2.35
+MIN_GLIBC=2.39
 
 if [ "${SENTINEL_IN_CONTAINER:-}" != 1 ]; then
     image="$BUILDER"
@@ -119,8 +120,9 @@ Version: $PKGVER
 Architecture: amd64
 Maintainer: Tiburce-kay <Tiburce-kay@users.noreply.github.com>
 Installed-Size: $SIZE
-Depends: libc6 (>= $MIN_GLIBC), libpam0g, systemd, python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, pkexec | policykit-1
-Recommends: gnome-shell
+Depends: libc6 (>= $MIN_GLIBC), libpam0g, systemd, python3 (>= 3.12), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, pkexec | policykit-1
+Recommends: gnome-shell (>= 45)
+Breaks: gnome-shell (<< 45)
 Suggests: tpm2-tools
 Section: admin
 Priority: optional
