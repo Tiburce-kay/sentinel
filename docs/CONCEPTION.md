@@ -142,4 +142,5 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 4a | Visage dès le démarrage (option) + trousseau ouvert automatiquement ; abandon immédiat si trop sombre / aucun visage ; extension GNOME (écrans de connexion et de verrouillage) : champ du mot de passe masqué pendant la vérification, bouton « utiliser le mot de passe » | ✔ en usage réel sur le T570 (26/11) |
 | 4b | Verrouillage automatique en cas d'absence, alerte de regard indiscret | abandonné : le système verrouille déjà après inactivité, et une alerte instantanée exigerait la caméra allumée en permanence |
 | 5 | Campagne d'attaques et mesures ISO/IEC 30107-3 | à faire |
+| 7 | Paquets .deb (Ubuntu 22.04/24.04, Debian 12/13, Kali) testés en conteneur ; activation depuis l'assistant (pkexec) ; publication v0.2.0 | ✔ |
 | 6 | Clé confiée au coffre systemd, scellée dans la TPM 2.0 ; migration vérifiée ; mise à jour adaptative des gabarits | ✔ validé sur vraie TPM 2.0 (Intel PTT, T570, 26/11) ; gabarits adaptatifs à faire |
