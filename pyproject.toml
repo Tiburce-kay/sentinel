@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sentinel-face"
-version = "0.2.1"
+version = "0.2.2"
 description = "Authentification faciale locale pour Linux, résistante à l'usurpation (anti-spoofing) sur webcam ordinaire"
 readme = "README.md"
 requires-python = ">=3.10"

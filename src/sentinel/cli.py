@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import os
 import pwd
 import sys
@@ -205,6 +206,73 @@ def cmd_remove(cfg: Config, args) -> int:
     return 0
 
 
+def cmd_campagne(cfg: Config, args) -> int:
+    from . import campaign as cp
+    from .enrollment import EnrollmentSession
+
+    root = Path(args.dossier).expanduser()
+    store = TemplateStore(root / "visages", strict_permissions=False, credentials_dir=None,
+                         uses_system_vault=False)
+    csv_path, groups_path = root / "essais.csv", root / "participants.csv"
+    if args.action == "rapport":
+        if not csv_path.exists():
+            print(f"Aucun essai dans {csv_path}.")
+            return 1
+        print(cp.report(cp.load(csv_path), cp.load_groups(groups_path)))
+        return 0
+    pid = cp.participant_id(args.participant or "")
+    if args.action == "effacer":
+        print(f"Visage de {pid.upper()} supprimé." if store.remove(pid) else f"Aucun visage pour {pid.upper()}.")
+        return 0
+    store.init()
+    engine = _engine(cfg)
+    if args.action == "inscrire":
+        session = EnrollmentSession(engine)
+        print(f"Inscription de {pid.upper()} : suivez les consignes.")
+        last = ""
+        with _camera(cfg) as cam:
+            for frame in cam.frames(cfg.enroll.timeout_s):
+                ev = session.feed(frame)
+                msg = f"[{ev.progress:4.0%}] {ev.instruction}" + (f" — {ev.hint}" if ev.hint else "")
+                if msg != last:
+                    print(f"  {msg}")
+                    last = msg
+                if ev.done:
+                    break
+            camera_id = cam.info.identity
+        out = session.finish()
+        if not out.ok:
+            print(f"Échec : {out.reason}.")
+            return 1
+        store.save(Enrollment(user=pid, embeddings=out.embeddings, camera=camera_id,
+                              liveness_threshold=out.liveness_threshold, stats=out.stats))
+        print(f"{pid.upper()} inscrit (aucune image conservée).")
+        return 0
+    # essai
+    enr = store.load(pid)
+    if enr is None:
+        print(f"{pid.upper()} n'est pas inscrit : sentinel campagne inscrire {pid.upper()}")
+        return 1
+    print(f"{args.essais} essais « {args.type} » pour {pid.upper()} : {cp.TYPES[args.type]}.")
+    for i in range(1, args.essais + 1):
+        try:
+            input(f"\nEssai {i}/{args.essais} : préparez la présentation, puis appuyez sur Entrée… ")
+        except EOFError:
+            return 0
+        with _camera(cfg) as cam:
+            res = engine.authenticate(
+                cam.frames(cfg.auth.timeout_s + cfg.auth.challenge_timeout_s), enr.embeddings,
+                enr.liveness_threshold, enr.stats.get("reference_pose"),
+                on_challenge=lambda m: print(f"  >>> {m}", flush=True))
+            tag = cp.camera_tag(cam.info.identity)
+        cp.append(csv_path, cp.Attempt(pid, tag, args.condition, args.type, res.ok, res.status.name.lower(),
+                                       res.elapsed_s, res.best_similarity, res.window_liveness, res.challenge))
+        verdict = "ACCEPTÉ" if res.ok else "refusé"
+        print(f"  {verdict} : {res.status.value} ({res.elapsed_s:.1f} s)")
+    print(f"\nRésultats ajoutés à {csv_path} — synthèse : sentinel campagne rapport")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="sentinel", description="Authentification faciale locale et résistante à l'usurpation.")
     p.add_argument("--version", action="version", version=f"sentinel {__version__}")
@@ -218,6 +286,14 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("label", nargs="?", help="reel, autre, photo-ecran, photo-papier, video…")
     c.add_argument("--duration", type=float, default=20.0, help="durée en secondes (défaut 20)")
     c.add_argument("--report", action="store_true", help="affiche l'analyse des mesures")
+    cg = sub.add_parser("campagne", help="campagne de tests à plusieurs personnes (docs/CAMPAGNE.md)")
+    cg.add_argument("action", choices=("inscrire", "essai", "rapport", "effacer"))
+    cg.add_argument("participant", nargs="?", help="identifiant : P01, P02… (jamais de nom)")
+    cg.add_argument("--type", choices=("authentique", "imposteur", "photo-papier", "photo-ecran", "video"),
+                    default="authentique")
+    cg.add_argument("--essais", type=int, default=10)
+    cg.add_argument("--condition", default="normale", help="éclairage : normale, sombre, contre-jour…")
+    cg.add_argument("--dossier", default="~/sentinel-campagne", help="dossier de la campagne")
     sub.add_parser("list", help="liste les utilisateurs enrôlés")
     sub.add_parser("remove", help="supprime votre visage")
     for name in ("enroll", "test", "remove", "calibrate"):
@@ -230,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = load_config()
         return {"init": cmd_init, "doctor": cmd_doctor, "enroll": cmd_enroll, "test": cmd_test,
-                "calibrate": cmd_calibrate, "list": cmd_list, "remove": cmd_remove}[args.cmd](cfg, args)
+                "calibrate": cmd_calibrate, "campagne": cmd_campagne, "list": cmd_list, "remove": cmd_remove}[args.cmd](cfg, args)
     except (ConfigError, StoreError, ModelError, CameraError, ValueError) as exc:
         print(f"Erreur : {exc}", file=sys.stderr)
         return 1

@@ -101,12 +101,15 @@ class TemplateStore:
     CREDENTIAL_NAME = "sentinel-master-key"
 
     def __init__(self, data_dir: Path, strict_permissions: bool = True,
-                 credentials_dir: Path | None = None):
+                 credentials_dir: Path | None = None, uses_system_vault: bool = True):
         self.root = Path(data_dir)
         self.strict = strict_permissions
         self.users_dir = self.root / "users"
         self.state_dir = self.root / "state"
         self.key_path = self.root / "master.key"
+        # Stockage du système (service) : relié au coffre de systemd. Un stockage à part
+        # (campagne de tests) a sa propre clé et n'est pas concerné par le coffre.
+        self.uses_system_vault = uses_system_vault
         # Clé fournie par le coffre de systemd (systemd-creds, LoadCredentialEncrypted) :
         # chiffrée sur le disque, scellée dans la puce TPM 2.0 quand il y en a une, et
         # déchiffrée par systemd au démarrage du service seulement.
@@ -155,7 +158,7 @@ class TemplateStore:
         (incident réel du 27/11 : réinstallation après désinstallation --keep-data)."""
         if any(self.users_dir.glob("*.tpl")) or any(self.users_dir.glob("*.authtok")):
             return False
-        return not self.VAULT_FILE.exists()
+        return not (self.uses_system_vault and self.VAULT_FILE.exists())
 
     def check_permissions(self) -> None:
         if not self.root.exists():
