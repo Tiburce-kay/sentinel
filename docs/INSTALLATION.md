@@ -128,6 +128,15 @@ désactivée sur un PC portable qui voyage.
   en bas à droite, puis saisissez votre mot de passe. Votre choix est retenu pour les
   connexions suivantes.
 
+  Bon à savoir, sans rapport avec Sentinel : en ouvrant sa session, KDE Plasma recopie
+  ses icônes, son curseur et sa police dans les réglages de GNOME. De retour sous GNOME,
+  pour retrouver les vôtres :
+  ```bash
+  gsettings reset org.gnome.desktop.interface icon-theme
+  gsettings reset org.gnome.desktop.interface cursor-theme
+  gsettings reset org.gnome.desktop.interface font-name
+  ```
+
 ### Le mot de passe reste toujours possible
 
 Sentinel ne bloque jamais l'accès. Le mot de passe est demandé comme d'habitude, en
