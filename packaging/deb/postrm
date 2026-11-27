@@ -14,6 +14,14 @@ if [ "$1" = "purge" ]; then
     rm -rf /var/lib/sentinel /etc/systemd/system/sentineld.service.d
     rm -f /etc/credstore.encrypted/sentinel-master-key /etc/credstore.encrypted/sentinel-master-key.mode
     rm -f /etc/sentinel/pam-desactive
+    # Copies des fichiers PAM d'origine, faites avant la première modification : effacées
+    # seulement si le fichier ne contient plus aucune ligne de Sentinel (sinon, elles
+    # restent le moyen de le réparer).
+    for b in /etc/pam.d/*.sentinel-backup; do
+        [ -e "$b" ] || continue
+        f="${b%.sentinel-backup}"
+        if [ ! -e "$f" ] || ! grep -q pam_sentinel "$f"; then rm -f "$b"; fi
+    done
     [ -d /run/systemd/system ] && systemctl daemon-reload || true
 fi
 exit 0

@@ -19,6 +19,10 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   Sentinel pour tout le PC (`sentinel-pam sync --sudo off --screen off`, choix conservé
   lors des mises à jour).
 
+### Corrigé
+- La purge efface aussi les copies des fichiers PAM d'origine (`/etc/pam.d/*.sentinel-backup`),
+  sauf si un fichier contient encore une ligne de Sentinel.
+
 ## [0.2.2] — 2026-11-27
 
 ### Changé

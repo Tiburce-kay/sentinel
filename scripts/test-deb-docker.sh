@@ -91,6 +91,8 @@ echo "=== 5. purge"
 apt-get purge -y sentinel >/dev/null 2>&1 || fail "purge"
 [ -e /var/lib/sentinel ] && fail "données de visage restantes après la purge"
 [ -e /opt/sentinel ] && fail "fichiers restants dans /opt/sentinel"
+ls /etc/pam.d/*.sentinel-backup >/dev/null 2>&1 && fail "copies PAM restantes après la purge"
+[ -e /etc/sentinel ] && fail "dossier /etc/sentinel restant après la purge"
 ok "données et fichiers supprimés"
 
 echo "RÉSULTAT PAQUET $IMAGE : OK"
