@@ -10,3 +10,4 @@ dev-data/
 # Binaires compilés
 pam/pam_sentinel.so
 pam/pam-harness
+dist/

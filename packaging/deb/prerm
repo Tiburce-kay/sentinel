@@ -1,0 +1,17 @@
+#!/bin/sh
+# Sentinel : avant le retrait. PRIORITÉ ABSOLUE : retirer Sentinel de PAM avant que
+# le module ne disparaisse, sinon sudo et l'écran de connexion chercheraient un
+# module manquant. (Lors d'une mise à jour, rien n'est retiré.)
+set -e
+case "$1" in
+    remove|deconfigure)
+        if [ -x /usr/sbin/sentinel-pam ]; then
+            /usr/sbin/sentinel-pam sync --sudo off --screen off >/dev/null 2>&1 || true
+            /usr/sbin/sentinel-pam disable polkit-1 >/dev/null 2>&1 || true
+        fi
+        if [ -d /run/systemd/system ]; then
+            systemctl disable --now sentineld >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+exit 0

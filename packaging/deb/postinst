@@ -1,0 +1,18 @@
+#!/bin/sh
+# Sentinel : configuration après installation ou mise à jour du paquet.
+set -e
+if [ "$1" = "configure" ]; then
+    # Écran de connexion (GDM, Debian/Ubuntu) : recompile ses réglages (extension).
+    [ -x /usr/share/gdm/generate-config ] && /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload
+        systemctl enable sentineld >/dev/null 2>&1 || true
+        systemctl restart sentineld || true
+        # Clé de chiffrement confiée au coffre de systemd (TPM 2.0 si disponible).
+        sleep 4
+        sh /opt/sentinel/lib/protect-key.sh /opt/sentinel || \
+            echo "Sentinel : protection de la clé non appliquée ; la clé reste un fichier root."
+    fi
+    echo "Sentinel installé : lancez « Sentinel » depuis le menu des applications."
+fi
+exit 0
