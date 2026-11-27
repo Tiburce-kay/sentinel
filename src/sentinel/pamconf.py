@@ -108,24 +108,63 @@ def apply(service: str, on: bool, pam_dir: Path = PAM_DIR) -> str:
     return "activé" if on else "désactivé"
 
 
+def status(pam_dir: Path = PAM_DIR) -> dict[str, str]:
+    out = {}
+    for svc in SERVICES:
+        p = pam_dir / svc
+        out[svc] = ("activé" if is_enabled(p.read_text()) else "désactivé") if p.exists() else "absent"
+    return out
+
+
+def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR) -> dict[str, str]:
+    """Applique en une fois les choix de l'assistant : sudo (et sudo -i), écran de
+    connexion et de verrouillage (gdm-password). Les services absents sont ignorés."""
+    wanted = {"sudo": sudo, "sudo-i": sudo, "gdm-password": screen}
+    done = {}
+    for svc, on in wanted.items():
+        if not (pam_dir / svc).exists():
+            continue
+        try:
+            done[svc] = apply(svc, on, pam_dir)
+        except PamConfError:
+            if svc == "sudo-i":
+                # Disposition sans common-auth (ex. « @include sudo ») : couverte par sudo.
+                done[svc] = "ignoré (inclut la configuration de sudo)"
+            else:
+                raise
+    return done
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="sentinel-pam", description="Active Sentinel dans PAM (root).")
-    ap.add_argument("action", choices=("status", "enable", "disable"))
+    ap.add_argument("action", choices=("status", "enable", "disable", "sync"))
     ap.add_argument("service", nargs="?", choices=SERVICES)
+    ap.add_argument("--sudo", choices=("on", "off"), help="sync : visage pour sudo")
+    ap.add_argument("--screen", choices=("on", "off"), help="sync : visage pour l'écran de connexion")
+    ap.add_argument("--json", action="store_true", help="status : sortie JSON")
     ap.add_argument("--pam-dir", type=Path, default=PAM_DIR, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.action == "status":
-        for svc in SERVICES:
-            p = args.pam_dir / svc
-            state = ("activé" if is_enabled(p.read_text()) else "désactivé") if p.exists() else "absent"
-            print(f"{svc:<14}{state}")
+        st = status(args.pam_dir)
+        if args.json:
+            import json
+            print(json.dumps(st, ensure_ascii=False))
+        else:
+            for svc, state in st.items():
+                print(f"{svc:<14}{state}")
         return 0
-    if not args.service:
-        ap.error("préciser le service, par exemple : sudo")
     if os.geteuid() != 0 and args.pam_dir == PAM_DIR:
         print("À lancer avec sudo.", file=sys.stderr)
         return 2
     try:
+        if args.action == "sync":
+            if args.sudo is None or args.screen is None:
+                ap.error("sync demande --sudo on|off et --screen on|off")
+            for svc, result in sync(args.sudo == "on", args.screen == "on", args.pam_dir).items():
+                print(f"{svc} : {result}")
+            return 0
+        if not args.service:
+            ap.error("préciser le service, par exemple : sudo")
         print(f"{args.service} : {apply(args.service, args.action == 'enable', args.pam_dir)}")
     except PamConfError as exc:
         print(f"Erreur : {exc}", file=sys.stderr)

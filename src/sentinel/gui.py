@@ -144,6 +144,36 @@ def enable_lockscreen_button(on: bool) -> None:
         settings.set_strv("enabled-extensions", [u for u in enabled if u != EXTENSION_UUID])
 
 
+PAM_TOOL_CANDIDATES = ("/usr/sbin/sentinel-pam", "/usr/local/sbin/sentinel-pam")
+
+
+def sync_pam(sudo: bool, screen: bool) -> str:
+    """Active ou désactive le visage pour sudo et pour l'écran de connexion, avec la
+    fenêtre standard de mot de passe administrateur (pkexec), seulement si l'état du
+    système diffère des choix. Renvoie un message pour l'utilisateur ("" si rien à dire)."""
+    import json
+    import os
+    import subprocess
+
+    tool = next((t for t in PAM_TOOL_CANDIDATES if os.path.exists(t)), None)
+    if tool is None:
+        return "Outil d'activation introuvable : réinstallez Sentinel."
+    current = json.loads(subprocess.run([tool, "status", "--json"], capture_output=True,
+                                        text=True, timeout=10).stdout or "{}")
+    want = {"sudo": sudo, "gdm-password": screen}
+    if all(current.get(svc, "absent") in ("absent", "activé" if on else "désactivé")
+           for svc, on in want.items()):
+        return ""
+    r = subprocess.run(["pkexec", tool, "sync", "--sudo", "on" if sudo else "off",
+                        "--screen", "on" if screen else "off"], capture_output=True, text=True)
+    if r.returncode in (126, 127):
+        return ("Activation non effectuée (mot de passe administrateur annulé ou refusé). "
+                "Vous pouvez réessayer avec « Modifier mes réglages ».")
+    if r.returncode != 0:
+        return f"Activation impossible : {(r.stderr or r.stdout).strip()}"
+    return ""
+
+
 def in_thread(work, done) -> None:
     """Exécute `work` hors de l'interface, puis `done(résultat ou exception)` dans l'interface."""
     def run():
@@ -636,11 +666,26 @@ class Wizard(Adw.ApplicationWindow):
                         enable_lockscreen_button(uses["lockscreen"])
                     except Exception:  # noqa: BLE001 — confort, jamais bloquant
                         pass
+                    # Activation dans le système (sudo, écran de connexion) : fenêtre
+                    # standard de mot de passe administrateur si un changement est nécessaire.
+                    self.finish_button.set_sensitive(False)
+                    in_thread(lambda: sync_pam(uses["sudo"], uses["lockscreen"] or uses["login"]),
+                              self._after_pam)
+                    return
                 self._show("done")
             else:
                 self.confirm_error.set_label(result.get("message", "Échec"))
         action = self.backend.set_uses if self.settings_mode else self.backend.commit
         in_thread(lambda: action(password, uses), done)
+
+    def _after_pam(self, message) -> None:
+        self.finish_button.set_sensitive(True)
+        if isinstance(message, Exception):
+            message = f"Activation impossible : {message}"
+        base = ("Seules des empreintes chiffrées sont conservées, jamais d'image. "
+                "Vous pouvez relancer cet assistant pour modifier vos choix.")
+        self.done_status.set_description(f"{message}\n\n{base}" if message else base)
+        self._show("done")
 
     def _open_settings(self) -> None:
         """Modifier les usages sans refaire l'enregistrement du visage."""

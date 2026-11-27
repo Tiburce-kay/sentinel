@@ -87,3 +87,25 @@ def test_desactivation_d_une_ancienne_disposition_sufficient():
     old = enable(DEBIAN_GDM, keyring=False)
     assert disable(old) == DEBIAN_GDM
     assert enable(disable(old), keyring=True) != old
+
+
+def test_synchronisation_des_choix_de_l_assistant(tmp_path):
+    from sentinel.pamconf import status, sync
+    for name, text in (("sudo", DEBIAN_SUDO), ("gdm-password", DEBIAN_GDM)):
+        (tmp_path / name).write_text(text)
+        (tmp_path / name).chmod(0o644)
+    sync(sudo=True, screen=False, pam_dir=tmp_path)
+    assert status(tmp_path) == {"sudo": "activé", "sudo-i": "absent",
+                                "polkit-1": "absent", "gdm-password": "désactivé"}
+    sync(sudo=False, screen=True, pam_dir=tmp_path)
+    st = status(tmp_path)
+    assert st["sudo"] == "désactivé" and st["gdm-password"] == "activé"
+    assert (tmp_path / "sudo").read_text() == DEBIAN_SUDO   # restauré à l'identique
+
+
+def test_sudo_i_qui_inclut_sudo_est_ignore(tmp_path):
+    from sentinel.pamconf import sync
+    (tmp_path / "sudo").write_text(DEBIAN_SUDO)
+    (tmp_path / "sudo-i").write_text("#%PAM-1.0\n@include sudo\n")
+    done = sync(sudo=True, screen=False, pam_dir=tmp_path)
+    assert done["sudo"] == "activé" and done["sudo-i"].startswith("ignoré")
