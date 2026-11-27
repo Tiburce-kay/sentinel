@@ -35,13 +35,18 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 
 ## Installation (Debian, Ubuntu, Kali)
 
-**Le plus simple :** téléchargez le paquet de votre distribution dans les
-[Releases](https://github.com/Tiburce-kay/sentinel/releases), puis double-cliquez dessus,
-ou :
+**Le plus simple :** téléchargez **le** paquet `sentinel_<version>-1_amd64.deb` dans les
+[Releases](https://github.com/Tiburce-kay/sentinel/releases) — un seul paquet pour toute la
+famille Debian — puis double-cliquez dessus, ou :
 
 ```bash
-sudo apt install ./sentinel_0.2.0-1.ubuntu24.04_amd64.deb
+sudo apt install ./sentinel_0.2.2-1_amd64.deb
 ```
+
+**Configuration minimale :** Ubuntu 22.04 ou Debian 12, ou plus récent (Kali, Linux Mint 21+,
+Zorin 17+, Pop!_OS 22.04+…), processeur 64 bits, bureau GNOME, webcam. Sur un système plus
+ancien, `apt` refuse l'installation. Le paquet embarque son propre Python et ses
+bibliothèques d'IA : il ne dépend pas de la version de Python de la distribution.
 
 Lancez ensuite **Sentinel** depuis le menu des applications : l'assistant enregistre votre
 visage, puis active la reconnaissance pour `sudo` et l'écran de connexion (mot de passe
