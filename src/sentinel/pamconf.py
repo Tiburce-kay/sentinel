@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(st, ensure_ascii=False))
         else:
             for svc, state in st.items():
-                print(f"{svc:<14}{state}")
+                print(f"{svc:<17}{state}")
         return 0
     if os.geteuid() != 0 and args.pam_dir == PAM_DIR:
         print("À lancer avec sudo.", file=sys.stderr)
