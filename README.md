@@ -40,7 +40,7 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 ou :
 
 ```bash
-sudo apt install ./sentinel_0.2.0-1~ubuntu24.04_amd64.deb
+sudo apt install ./sentinel_0.2.0-1.ubuntu24.04_amd64.deb
 ```
 
 Lancez ensuite **Sentinel** depuis le menu des applications : l'assistant enregistre votre
