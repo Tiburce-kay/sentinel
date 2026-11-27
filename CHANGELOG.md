@@ -23,7 +23,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - La purge efface aussi les copies des fichiers PAM d'origine (`/etc/pam.d/*.sentinel-backup`),
   sauf si un fichier contient encore une ligne de Sentinel.
 
-## [0.2.2] — 2026-11-27
+## [0.2.2] — 2026-11-27 — paquet retiré (publié sans licence), remplacé par la 0.2.3
 
 ### Changé
 - **Un seul paquet `.deb`**, réservé aux distributions livrées avec GNOME 45 ou plus
@@ -69,7 +69,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   - un gabarit illisible est signalé dans l'assistant, qui propose de réenregistrer
     le visage.
 
-## [0.2.0] — 2026-11-27 — ⚠️ obsolète, ne plus utiliser
+## [0.2.0] — 2026-11-27 — ⚠️ paquet retiré (perte de clé à la réinstallation)
 
 ### Ajouté
 - Paquets `.deb` par distribution, activation depuis l'assistant par la fenêtre
@@ -91,5 +91,5 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Assistant graphique GTK4 / libadwaita.
 
 [0.2.3]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.3
-[0.2.2]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.2
-[0.2.0]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.0
+[0.2.2]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.2
+[0.2.0]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.0

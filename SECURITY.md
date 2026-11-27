@@ -20,8 +20,7 @@ contournement sous 30 jours pour une faille sérieuse.
 | Version | Correctifs de sécurité |
 |---|---|
 | 0.2.3 et suivantes | ✅ |
-| 0.2.2 | ✅ (identique, sans licence) |
-| 0.2.0 | ❌ obsolète (perte de clé à la réinstallation) : passer à la dernière version |
+| 0.2.2 et antérieures | ❌ paquets retirés : passer à la dernière version |
 
 ## Périmètre
 
