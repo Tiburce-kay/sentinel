@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "Si vous utilisez Sentinel dans un travail de recherche, merci de le citer ainsi."
+title: "Sentinel : authentification faciale locale et résistante à l'usurpation sur webcam ordinaire"
+type: software
+authors:
+  - alias: Tiburce-kay
+version: 0.2.2
+date-released: 2026-11-27
+repository-code: "https://github.com/Tiburce-kay/sentinel"
+keywords:
+  - authentification faciale
+  - détection du vivant
+  - presentation attack detection
+  - PAM
+  - Linux
+  - TPM 2.0
+abstract: >-
+  Système d'authentification faciale pour Linux (sudo, écran de verrouillage, connexion
+  GNOME) fonctionnant entièrement en local avec une webcam RGB ordinaire : détection du
+  vivant par texture décidée sur une fenêtre glissante, défi adaptatif au risque avec
+  contrôle du relief 3D, enrôlement en 5 poses, service isolé sans réseau, gabarits
+  chiffrés dont la clé est scellée dans la puce TPM 2.0.

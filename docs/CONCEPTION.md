@@ -22,7 +22,7 @@ exigences :
 | Remplacement du gabarit facial par celui de l'attaquant (« Face Swap », « Faceplant », Black Hat 2025) | Windows Hello sans ESS | Gabarits chiffrés et liés au compte (AES-256-GCM avec données associées) |
 | Caméra usurpée qui rejoue des images (CVE-2021-34466) | Windows Hello | Caméras virtuelles refusées ; identité de la caméra épinglée à l'enrôlement |
 | Trousseau GNOME non déverrouillé après une connexion par le visage | Howdy + GNOME | Règle « mot de passe au démarrage, visage ensuite » (comme Face ID) |
-| Interpréteur Python lancé avec les droits root à chaque authentification | Howdy | Module PAM minimal en C ; analyse dans un service isolé (phase 3) |
+| Interpréteur Python lancé avec les droits root à chaque authentification | Howdy | Module PAM minimal en C ; analyse dans un service isolé sans réseau |
 | Projets sans IR abandonnés | Biopass | — |
 
 ## 3. Architecture
@@ -31,15 +31,15 @@ exigences :
           sudo / GDM / écran de verrouillage
                        │  PAM
                        ▼
-            pam_sentinel.so  (C, minimal)          ← phase 3
+            pam_sentinel.so  (C, minimal)
                        │  socket Unix, protocole fixe
                        ▼
-     sentineld  (service systemd, sans réseau, modèles chargés en mémoire)
+     sentineld  (service systemd isolé : sans réseau, seule la caméra est accessible)
         │
         ├─ camera.py    webcam USB uniquement, identité vérifiée
         ├─ vision.py    YuNet (détection) · SFace (empreinte) · MiniFASNet (vivant)
-        ├─ auth.py      décision : N images consécutives, chacune reconnue ET vivante
-        ├─ store.py     gabarits chiffrés, compteur d'échecs
+        ├─ auth.py      décision : 10 images reconnues, moyenne du vivant, défi adaptatif
+        ├─ store.py     gabarits chiffrés (clé scellée dans la TPM 2.0), compteur d'échecs
         └─ models.py    modèles vérifiés par SHA-256 avant chargement
 ```
 
@@ -79,16 +79,16 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 
 | Attaque | Défense | État |
 |---|---|---|
-| Photo imprimée | Texture (MiniFASNet) | Phase 2 ✔ |
-| Photo ou vidéo sur un écran | Texture + défi aléatoire | Texture ✔, défi : phase 2b |
+| Photo imprimée | Texture (MiniFASNet) + relief | défense en place ; non encore mesurée (campagne) |
+| Photo ou vidéo sur un écran | Texture + défi aléatoire | ✔ (324 images de photo sur téléphone : aucune fenêtre acceptée) |
 | Vidéo préenregistrée de l'utilisateur | Défi adaptatif au risque : si le vivant est « limite », tourner la tête dans une direction tirée au sort, avec relief 3D et identité vérifiés pendant le geste | ✔ testé (reflet de couleurs : assistant seulement, à venir) |
 | Caméra virtuelle qui diffuse une vidéo | Pilote uvcvideo exigé, identité épinglée | ✔ |
 | Gabarit d'un autre compte copié (Face Swap) | AAD liée au nom d'utilisateur | ✔ testé |
 | Gabarit fabriqué ailleurs (Faceplant) | Clé locale ; tout gabarit chiffré avec une autre clé est refusé | ✔ testé |
 | Modèle d'IA remplacé | Vérification SHA-256 avant chargement | ✔ testé |
 | Configuration affaiblie (seuil à 0) | Fichier de configuration exigé root, non modifiable par d'autres | ✔ |
-| Essais répétés | Verrouillage après 5 échecs, mot de passe exigé | Phase 3 |
-| Fuite de la biométrie | Aucune image stockée ; gabarits chiffrés ; service sans réseau | ✔ / phase 3 |
+| Essais répétés | Verrouillage après 5 échecs, mot de passe exigé ; refus journalisés | ✔ testé |
+| Fuite de la biométrie | Aucune image stockée ; gabarits chiffrés, dossier réservé à root ; service sans réseau | ✔ |
 | Traversée de chemin via le nom d'utilisateur | Validation stricte du nom | ✔ testé |
 
 ### Limites assumées
@@ -100,7 +100,7 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
   dans la puce (sans lien avec l'état du démarrage, pour survivre aux mises à jour du
   BIOS) : une copie complète du disque ne suffit pas à la déchiffrer ailleurs. Sans TPM
   2.0, elle est liée au secret du système
-  (`/var/lib/systemd/credential.secret`). Avant systemd 250 : fichier root 0600.
+  (`/var/lib/systemd/credential.secret`).
 - **Un jumeau ou un masque 3D réaliste** : hors de portée d'une webcam RGB seule.
   La biométrie faciale reste un facteur de **confort**, pas un remplaçant du mot de
   passe pour les comptes les plus sensibles.
@@ -122,11 +122,14 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
    ouvert grâce au mot de passe conservé **chiffré** (AES-256-GCM, lié au compte),
    rendu uniquement au module PAM après un succès du visage, pour une nouvelle
    session, et tenu à jour à chaque mot de passe saisi (après vérification PAM).
-   Limite assumée : un attaquant déjà root peut le déchiffrer ; la puce TPM du PC
-   servira de coffre plus solide.
+   Limite assumée : un attaquant déjà root sur la machine allumée peut le déchiffrer ;
+   la clé scellée dans la TPM empêche en revanche de le lire depuis une copie du disque.
 3. **Après 5 échecs consécutifs**, le visage est refusé jusqu'au prochain mot de passe.
-4. **Installation progressive** : `sudo` d'abord, avec une session root ouverte en
-   secours, puis l'écran de verrouillage, puis GDM.
+4. **Activation explicite** : l'installation du paquet n'active rien ; l'utilisateur
+   choisit les usages dans l'assistant, puis confirme avec le mot de passe
+   administrateur. Le retrait du paquet restaure PAM **avant** de supprimer les fichiers.
+5. **Aucune nouvelle clé là où des données existent**, et la clé du coffre n'est jamais
+   remplacée (incident du 27/11/2026, `CHANGELOG.md`).
 
 ## 6. Feuille de route
 
@@ -142,5 +145,6 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
 | 4a | Visage dès le démarrage (option) + trousseau ouvert automatiquement ; abandon immédiat si trop sombre / aucun visage ; extension GNOME (écrans de connexion et de verrouillage) : champ du mot de passe masqué pendant la vérification, bouton « utiliser le mot de passe » | ✔ en usage réel sur le T570 (26/11) |
 | 4b | Verrouillage automatique en cas d'absence, alerte de regard indiscret | abandonné : le système verrouille déjà après inactivité, et une alerte instantanée exigerait la caméra allumée en permanence |
 | 5 | Campagne de tests à plusieurs personnes et webcams : outil `sentinel campagne`, protocole (docs/CAMPAGNE.md), consentement (docs/CONSENTEMENT.md) ; mesures ISO/IEC 30107-3 | outillage ✔, campagne à mener |
-| 7 | Paquet .deb unique (Python embarqué) pour GNOME 45+ : Ubuntu 24.04+, Debian 13+, Kali ; testé en conteneur (IA, sudo, mise à jour, retrait) et refus vérifié sur Ubuntu 22.04 / Debian 12 ; activation depuis l'assistant (pkexec) ; écran de verrouillage et connexion essayés sur un vrai PC | ✔ |
 | 6 | Clé confiée au coffre systemd, scellée dans la TPM 2.0 ; migration vérifiée ; mise à jour adaptative des gabarits | ✔ validé sur vraie TPM 2.0 (Intel PTT, T570, 26/11) ; gabarits adaptatifs à faire |
+| 7 | Paquet .deb unique (Python embarqué) pour GNOME 45+ : Ubuntu 24.04+, Debian 13+, Kali ; testé en conteneur (IA, sudo, mise à jour, retrait) et refus vérifié sur Ubuntu 22.04 / Debian 12 ; activation depuis l'assistant (pkexec) ; écran de verrouillage et connexion essayés sur un vrai PC | ✔ |
+| 8 | Prise en charge de chaque nouvelle version de GNOME (52+) : `scripts/check-gnome-compat.sh`, essai en machine virtuelle (docs/MAINTENANCE.md) | procédure ✔ |

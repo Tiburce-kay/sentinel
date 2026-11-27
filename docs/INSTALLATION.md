@@ -1,0 +1,175 @@
+# Guide d'installation et d'utilisation
+
+Ce guide s'adresse à toute personne qui veut utiliser Sentinel, sans connaissance
+technique particulière. Comptez **5 minutes**, dont 30 secondes d'enregistrement du
+visage.
+
+## 1. Vérifier que votre PC est compatible
+
+| Il faut | Comment vérifier |
+|---|---|
+| Ubuntu 24.04 ou plus récent, Debian 13 ou plus récent, ou Kali | Paramètres → À propos, ou `cat /etc/os-release` |
+| Bureau GNOME 45 ou plus récent | Paramètres → À propos, ou `gnome-shell --version` |
+| PC 64 bits (Intel ou AMD) | `uname -m` affiche `x86_64` |
+| Une webcam (intégrée ou USB) | — |
+| Facultatif : puce TPM 2.0, pour une protection maximale de la clé | `cat /sys/class/tpm/tpm0/tpm_version_major` affiche `2` |
+
+Si votre système est trop ancien, l'installation est simplement refusée : rien n'est
+modifié. Avec un autre bureau que GNOME (KDE, Xfce, Cinnamon), seul `sudo` peut
+utiliser le visage.
+
+## 2. Télécharger le paquet
+
+1. Ouvrez la page des [versions publiées](https://github.com/Tiburce-kay/sentinel/releases)
+   et prenez la plus récente (marquée *Latest*).
+2. Téléchargez **`sentinel_<version>-1_amd64.deb`** et **`SHA256SUMS`** dans le même
+   dossier, par exemple `Téléchargements`.
+3. Facultatif mais recommandé, vérifiez que le fichier n'a pas été altéré :
+
+   ```bash
+   cd ~/Téléchargements
+   sha256sum -c SHA256SUMS
+   ```
+   La réponse attendue est `sentinel_<version>-1_amd64.deb: OK`.
+
+## 3. Installer
+
+```bash
+cd ~/Téléchargements
+sudo apt install ./sentinel_*_amd64.deb
+```
+
+Le `./` est important : il indique à `apt` d'installer ce fichier plutôt que de le
+chercher sur Internet. `apt` installe aussi les quelques composants nécessaires.
+
+À la fin, un message indique comment la clé de chiffrement est protégée :
+
+| Message | Signification |
+|---|---|
+| `clé protégée : puce TPM 2.0 + secret du système` | protection maximale : la clé ne peut pas être lue depuis un autre PC |
+| `clé protégée : secret du système` | pas de TPM 2.0 utilisable ; la clé reste chiffrée et réservée à root |
+
+**Rien n'est encore activé** : `sudo` et l'écran de connexion fonctionnent comme avant
+tant que vous n'avez pas terminé l'assistant.
+
+## 4. Enregistrer votre visage
+
+Ouvrez **Sentinel** depuis le menu des applications, puis cliquez sur **Commencer**.
+
+| Étape | Ce que vous faites |
+|---|---|
+| ![](images/assistant-welcome.png) | **Accueil** : cliquez sur *Commencer*. |
+| ![](images/assistant-capture.png) | **Enregistrement** : l'écran devient blanc pour bien éclairer votre visage. Regardez la caméra, puis tournez **doucement** la tête dans la direction demandée : face, gauche, droite, haut, bas. Le cercle se remplit. |
+| ![](images/assistant-confirm.png) | **Choix** : choisissez où utiliser votre visage, saisissez votre mot de passe, puis cliquez sur *Terminer*. Une fenêtre demande ensuite le mot de passe administrateur pour activer ces choix dans le système. |
+| ![](images/assistant-done.png) | **Terminé**. |
+
+**Conseils pour l'enregistrement :** soyez de face, à 40-60 cm de l'écran, sans
+lumière forte derrière vous. Gardez vos lunettes si vous les portez d'habitude.
+
+### Les trois usages
+
+| Usage | Ce que ça fait | Par défaut |
+|---|---|---|
+| Commandes administrateur | `sudo` dans un terminal | activé |
+| Écran de verrouillage | déverrouiller la session déjà ouverte (Super+L, mise en veille) | activé |
+| Connexion au démarrage | ouvrir la session dès le démarrage, trousseau de mots de passe compris | désactivé |
+
+**À propos de la connexion au démarrage :** pour ouvrir votre trousseau de mots de passe
+(Wi-Fi, navigateur…), Sentinel conserve votre mot de passe **chiffré** sur le PC. C'est
+pratique, mais un PC volé s'ouvrirait devant votre visage. Laissez cette option
+désactivée sur un PC portable qui voyage.
+
+## 5. Utiliser Sentinel au quotidien
+
+- **`sudo`** : tapez votre commande et regardez la caméra. La ligne
+  `Sentinel : regardez la caméra…` s'affiche, puis `visage reconnu` en 1 à 2 secondes.
+- **Écran de verrouillage et de connexion** : choisissez votre compte et regardez la
+  caméra. Le champ du mot de passe est masqué pendant la vérification.
+- **Le bouton clé « Utiliser le mot de passe »** arrête la vérification et affiche
+  aussitôt le champ du mot de passe.
+- **Un défi peut apparaître**, par exemple `Tournez la tête vers votre gauche`, quand
+  l'image est difficile à juger. Tournez doucement la tête, puis revenez de face.
+
+### Le mot de passe reste toujours possible
+
+Sentinel ne bloque jamais l'accès. Le mot de passe est demandé comme d'habitude, en
+1 à 1,5 seconde, dans tous ces cas : pièce trop sombre, personne devant la caméra,
+webcam absente ou en panne, visage non reconnu, service arrêté.
+
+Juste après le démarrage, le premier déverrouillage se fait par mot de passe, sauf si
+vous avez activé la connexion au démarrage. Après **5 échecs** (photo présentée, autre
+personne…), le visage est refusé jusqu'à ce que vous saisissiez votre mot de passe.
+
+## 6. Modifier ses réglages, remplacer ou supprimer son visage
+
+Ouvrez **Sentinel** depuis le menu :
+
+- **Modifier mes réglages** : changer les usages sans refaire l'enregistrement ;
+- **Remplacer mon visage** : refaire l'enregistrement, par exemple après un changement
+  d'apparence important ou de webcam ;
+- **Supprimer mon visage** : efface votre empreinte, et le mot de passe redevient le seul moyen.
+
+Chaque personne du PC enregistre **son propre** visage depuis **sa propre** session :
+le visage de l'une n'ouvre jamais le compte d'une autre.
+
+## 7. Mettre à jour
+
+Téléchargez le nouveau paquet, puis installez-le par-dessus l'ancien, **sans
+désinstaller d'abord** :
+
+```bash
+sudo apt install ./sentinel_<nouvelle-version>-1_amd64.deb
+```
+
+Votre visage, vos réglages et votre clé sont conservés, et Sentinel reste activé.
+
+## 8. Désinstaller
+
+| Commande | Effet |
+|---|---|
+| `sudo apt remove sentinel` | retire Sentinel ; `sudo` et l'écran de connexion reviennent au mot de passe seul ; visage et clé **conservés** pour une réinstallation |
+| `sudo apt purge sentinel` | retire Sentinel **et efface** visages, mot de passe conservé et clé de chiffrement |
+
+Dans les deux cas, la configuration de sécurité du système (PAM) est remise dans son
+état d'origine **avant** la suppression des fichiers.
+
+## 9. En cas de problème
+
+| Symptôme | Que faire |
+|---|---|
+| « délai écoulé avant confirmation » ou « tête trop tournée » | Restez de face, immobile, une à deux secondes. |
+| `sudo` demande toujours le mot de passe | Juste après le démarrage, c'est normal : saisissez-le une fois. Sinon, ouvrez Sentinel et vérifiez que *Commandes administrateur* est activé. |
+| « trop sombre : utilisez votre mot de passe » | Allumez une lampe face à vous. La webcam ordinaire ne voit pas dans le noir. |
+| « usurpation suspectée (photo, écran ou vidéo) » avec votre vrai visage | Évitez les forts contre-jours et regardez la caméra de face. Si cela se répète, refaites l'enregistrement dans votre éclairage habituel. |
+| « caméra différente de celle de l'enrôlement » | Vous avez changé de webcam : *Remplacer mon visage*. |
+| « trop d'échecs : mot de passe requis » | Saisissez votre mot de passe une fois : le visage est réactivé. |
+| Le bouton clé n'apparaît pas | Fermez la session et rouvrez-la. Vérifiez que votre version de GNOME est prise en charge (section 1). |
+| Le bouton *Commencer* est grisé | Le service ne répond pas : `systemctl status sentineld`. Si le message parle de visage illisible, utilisez *Remplacer mon visage*. |
+
+Le journal de Sentinel contient des mesures, jamais d'image :
+
+```bash
+journalctl -u sentineld -n 30                # derniers essais
+journalctl -u sentineld -p warning           # tentatives refusées et verrouillages seulement
+```
+
+### Désactiver Sentinel en urgence
+
+Même si Sentinel ne bloque jamais le mot de passe, vous pouvez tout désactiver d'un
+coup, depuis un terminal :
+
+```bash
+sudo /usr/sbin/sentinel-pam sync --sudo off --screen off
+```
+
+Si la session graphique est inaccessible : **Ctrl+Alt+F3**, connexion avec votre nom
+d'utilisateur et votre mot de passe, la commande ci-dessus, puis **Ctrl+Alt+F1** (ou
+**F2**) pour revenir à l'écran de connexion.
+
+## 10. Vie privée
+
+- **Aucune image n'est enregistrée**, ni à l'enregistrement, ni à l'utilisation.
+  Sentinel conserve une empreinte numérique (128 nombres) par pose, chiffrée.
+- **Rien ne sort du PC** : le service n'a techniquement pas accès au réseau, et ce n'est
+  pas seulement une promesse (`PrivateNetwork=yes`, `IPAddressDeny=any`).
+- La caméra ne s'allume que pendant une vérification, et son voyant le montre.
