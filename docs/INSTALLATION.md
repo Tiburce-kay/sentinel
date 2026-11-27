@@ -15,8 +15,12 @@ visage.
 | Facultatif : puce TPM 2.0, pour une protection maximale de la clé | `cat /sys/class/tpm/tpm0/tpm_version_major` affiche `2` |
 
 Si votre système est trop ancien, l'installation est simplement refusée : rien n'est
-modifié. Avec un autre bureau que GNOME (KDE, Xfce, Cinnamon), seul `sudo` peut
-utiliser le visage.
+modifié.
+
+**Avec un autre bureau que GNOME** (KDE Plasma, Xfce, Cinnamon…), Sentinel fonctionne
+pour `sudo`. L'écran de connexion et l'écran de verrouillage restent au mot de passe :
+l'assistant grise ces options. **N'installez pas GNOME pour autant** : rien d'autre
+n'est nécessaire. La prise en charge de KDE Plasma est prévue.
 
 ## 2. Télécharger le paquet
 
@@ -217,6 +221,29 @@ gsettings set org.gnome.shell enabled-extensions "$(gsettings get org.gnome.shel
 | « trop d'échecs : mot de passe requis » | Saisissez votre mot de passe une fois : le visage est réactivé. |
 | Le bouton clé n'apparaît pas | Fermez la session et rouvrez-la. Vérifiez que votre version de GNOME est prise en charge (section 1). |
 | Le bouton *Commencer* est grisé | Le service ne répond pas : `systemctl status sentineld`. Si le message parle de visage illisible, utilisez *Remplacer mon visage*. |
+
+### KDE Plasma (ou autre bureau) : la version 0.2.4 a installé GNOME
+
+La version 0.2.4 faisait installer GNOME Shell et son écran de connexion (GDM) en même
+temps que Sentinel, y compris sur un PC KDE. Pour revenir à votre état d'origine :
+
+1. **Installez la dernière version de Sentinel** par-dessus (section 7). Elle ne demande
+   plus GNOME.
+2. **Vérifiez que votre écran de connexion est toujours celui de KDE** :
+
+   ```bash
+   cat /etc/X11/default-display-manager
+   ```
+   La réponse doit être `/usr/bin/sddm`. Si elle indique `gdm3`, rétablissez SDDM avec
+   `sudo dpkg-reconfigure sddm`, en choisissant `sddm` dans la liste.
+3. **Regardez ce qui peut être retiré, sans rien retirer encore** :
+
+   ```bash
+   apt autoremove --purge -s | grep '^Purg'
+   ```
+   La liste doit contenir des paquets GNOME (`gnome-shell`, `gdm3`, `mutter`…).
+   Vérifiez qu'elle ne contient rien dont vous avez besoin.
+4. **Si la liste vous convient**, retirez-les : `sudo apt autoremove --purge`.
 
 Le journal de Sentinel contient des mesures, jamais d'image :
 

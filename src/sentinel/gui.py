@@ -254,8 +254,27 @@ def screen_supported() -> bool:
     return Path("/etc/pam.d/gdm-password").exists()
 
 
-SCREEN_UNSUPPORTED = ("Disponible avec l'écran de connexion de GNOME (GDM). Ce PC en utilise "
-                      "un autre : le visage sert ici aux commandes administrateur.")
+DESKTOP_NAMES = {"KDE": "KDE Plasma", "X-CINNAMON": "Cinnamon", "XFCE": "Xfce", "MATE": "MATE",
+                 "LXQT": "LXQt", "COSMIC": "COSMIC", "BUDGIE": "Budgie", "UNITY": "Unity"}
+
+
+def desktop_name() -> str:
+    """Nom lisible du bureau en cours (XDG_CURRENT_DESKTOP), ou "" s'il est inconnu."""
+    import os
+    for part in os.environ.get("XDG_CURRENT_DESKTOP", "").upper().split(":"):
+        if part in DESKTOP_NAMES:
+            return DESKTOP_NAMES[part]
+    return ""
+
+
+def screen_unsupported_text() -> str:
+    """Option d'écran indisponible : dire pourquoi, sans laisser croire qu'il faut
+    installer GNOME (retour d'un utilisateur de Kubuntu)."""
+    desk = desktop_name()
+    where = f"avec {desk}" if desk else "avec votre bureau"
+    return (f"Pas encore disponible {where} : seul l'écran de connexion de GNOME est pris en "
+            "charge pour l'instant. Votre visage sert ici aux commandes administrateur (sudo). "
+            "Aucune installation supplémentaire n'est nécessaire.")
 
 
 class PasswordRow:
@@ -509,8 +528,8 @@ class Wizard(Adw.ApplicationWindow):
             uses.add(row.row)
         self.screen_ok = screen_supported()
         if not self.screen_ok:
-            self.use_lock.disable(SCREEN_UNSUPPORTED)
-            self.use_login.disable(SCREEN_UNSUPPORTED)
+            self.use_lock.disable(screen_unsupported_text())
+            self.use_login.disable(screen_unsupported_text())
         box.append(uses)
         self.confirm_group = confirm = Adw.PreferencesGroup(
             title="Confirmation",

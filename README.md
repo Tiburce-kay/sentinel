@@ -6,7 +6,7 @@ Déverrouillez `sudo`, l'écran de verrouillage et la session au démarrage en r
 votre webcam, sans caméra infrarouge, sans cloud et sans jamais perdre l'accès par mot
 de passe.
 
-![Version](https://img.shields.io/badge/version-0.2.4-blue)
+![Version](https://img.shields.io/badge/version-0.2.5-blue)
 ![Plateforme](https://img.shields.io/badge/Ubuntu%2024.04%2B%20%C2%B7%20Debian%2013%2B%20%C2%B7%20Kali-GNOME%2045%2B-orange)
 ![Tests](https://img.shields.io/badge/tests-191%20r%C3%A9ussis-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-PolyForm%20Noncommercial%201.0.0-lightgrey)
@@ -76,7 +76,7 @@ d'urgence).
 | Système | `sudo` | Écran de verrouillage et connexion | Champ masqué et bouton clé |
 |---|---|---|---|
 | Ubuntu 24.04+, Debian 13+, Kali (GNOME 45 à 51) | ✅ | ✅ | ✅ |
-| Mêmes distributions avec un autre bureau (KDE, Xfce, Cinnamon) | ✅ | — (options grisées) | — |
+| Mêmes distributions avec un autre bureau (KDE Plasma, Xfce, Cinnamon), par exemple Kubuntu | ✅ | — (prévu pour KDE Plasma) | — |
 | Ubuntu 22.04, Debian 12 et plus anciennes, processeurs ARM | installation refusée par `apt` | | |
 
 - Il faut un PC 64 bits, une webcam et systemd. La puce TPM 2.0 est facultative, mais

@@ -19,8 +19,8 @@ contournement sous 30 jours pour une faille sérieuse.
 
 | Version | Correctifs de sécurité |
 |---|---|
-| 0.2.4 et suivantes | ✅ |
-| 0.2.3 et antérieures | ❌ paquets retirés : passer à la dernière version |
+| 0.2.5 et suivantes | ✅ |
+| 0.2.4 et antérieures | ❌ paquets retirés : passer à la dernière version |
 
 ## Périmètre
 

@@ -126,7 +126,6 @@ Architecture: amd64
 Maintainer: Tiburce-kay <Tiburce-kay@users.noreply.github.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= $MIN_GLIBC), libpam0g, systemd, python3 (>= 3.12), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, pkexec | policykit-1
-Recommends: gnome-shell (>= 45)
 Breaks: gnome-shell (<< 45)
 Suggests: tpm2-tools
 Section: admin

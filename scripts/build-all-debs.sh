@@ -20,6 +20,15 @@ for image in $IMAGES; do
     scripts/test-deb-docker.sh "$image" "dist/$deb" > "$log" 2>&1
     grep -h "^RÉSULTAT" "$log" >> dist/rapport.txt || echo "RÉSULTAT PAQUET $image : ÉCHEC (voir $log)" >> dist/rapport.txt
 done
+# Sur un PC sans GNOME (KDE…), installer Sentinel ne doit tirer ni GNOME ni GDM :
+# apt installe les recommandations par défaut (bug de la 0.2.4, signalé sous Kubuntu).
+pulled="$(docker run --rm -v "$PWD/dist:/pkg:ro" ubuntu:24.04 sh -c "apt-get update -qq >/dev/null 2>&1;
+    apt-get install -s /pkg/$deb 2>/dev/null" | grep -E '^Inst (gnome-shell|gdm3|mutter|gnome-session|sddm|lightdm|plasma)' | cut -d' ' -f2 | tr '\n' ' ')"
+if [ -n "$pulled" ]; then
+    echo "BUREAU NON TIRÉ : ÉCHEC (installerait : $pulled)" >> dist/rapport.txt
+else
+    echo "BUREAU NON TIRÉ : OK (ni GNOME ni écran de connexion installés)" >> dist/rapport.txt
+fi
 for image in $REFUSED; do
     if docker run --rm -v "$PWD/dist:/pkg:ro" "$image" sh -c "apt-get update -qq >/dev/null 2>&1;
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /pkg/$deb >/dev/null 2>&1"; then

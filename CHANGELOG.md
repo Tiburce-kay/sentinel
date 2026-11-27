@@ -3,7 +3,17 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.2.5] — 2026-11-27
+
+### Corrigé
+- **Installer Sentinel sur un PC sans GNOME tirait GNOME Shell et GDM.** Signalé sous
+  Kubuntu (KDE Plasma) : le paquet recommandait `gnome-shell`, et `apt` installe les
+  recommandations par défaut, soit 853 paquets au lieu de 155, écran de connexion de
+  GNOME compris. La recommandation est retirée, et le test du paquet vérifie qu'aucun
+  bureau ni écran de connexion n'est installé.
+- Assistant, sur un autre bureau que GNOME : le message nomme le bureau (« Pas encore
+  disponible avec KDE Plasma ») et précise qu'aucune installation supplémentaire n'est
+  nécessaire. L'ancien texte laissait croire qu'il fallait installer GNOME.
 
 ### Changé
 - **Message précis quand le visage est vu mais inexploitable.** Avant, l'utilisateur
@@ -12,7 +22,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   floue : restez immobile un instant », etc. Le journal compte les images écartées par
   motif (`rejets=`). Observé sur un vrai PC le 27/11 : 34 images en 4 s, aucune analysée.
 
-## [0.2.4] — 2026-11-27
+## [0.2.4] — 2026-11-27 — paquet retiré, remplacé par la 0.2.5
 
 ### Corrigé
 - **Clé non placée dans la puce TPM lors d'une première installation.** Observé sur un
@@ -108,7 +118,8 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Service `sentineld` isolé, module PAM en C, `sudo` et écran de verrouillage.
 - Assistant graphique GTK4 / libadwaita.
 
-[0.2.4]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.4
+[0.2.5]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.5
+[0.2.4]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.4
 [0.2.3]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.3
 [0.2.2]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.2
 [0.2.0]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.0
