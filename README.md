@@ -63,6 +63,10 @@ sudo apt install ./sentinel_*_amd64.deb    # 3. installer
 Ouvrez ensuite **Sentinel** depuis le menu des applications : enregistrement du visage
 en 30 secondes, choix des usages, confirmation.
 
+**Désinstaller :** `sudo apt remove sentinel` (visages conservés) ou `sudo apt purge
+sentinel` (tout effacé), puis redémarrer. `sudo` et l'écran de connexion reviennent
+exactement à leur état d'origine ([détails](docs/INSTALLATION.md#8-désinstaller)).
+
 **→ Guide complet, pas à pas : [docs/INSTALLATION.md](docs/INSTALLATION.md)**
 (utilisation, mise à jour, désinstallation, résolution des problèmes, désactivation
 d'urgence).

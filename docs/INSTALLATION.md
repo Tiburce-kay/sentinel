@@ -144,13 +144,62 @@ Votre visage, vos réglages et votre clé sont conservés, et Sentinel reste act
 
 ## 8. Désinstaller
 
-| Commande | Effet |
-|---|---|
-| `sudo apt remove sentinel` | retire Sentinel ; `sudo` et l'écran de connexion reviennent au mot de passe seul ; visage et clé **conservés** pour une réinstallation |
-| `sudo apt purge sentinel` | retire Sentinel **et efface** visages, mot de passe conservé et clé de chiffrement |
+### Choisir ce que vous voulez faire
 
-Dans les deux cas, la configuration de sécurité du système (PAM) est remise dans son
-état d'origine **avant** la suppression des fichiers.
+| Vous voulez… | Que faire |
+|---|---|
+| Ne plus utiliser **votre** visage, en gardant Sentinel pour les autres comptes | Ouvrez **Sentinel** → *Supprimer mon visage*, ou *Modifier mes réglages* pour couper un seul usage. Pas besoin de désinstaller. |
+| Retirer Sentinel **en gardant** les visages, pour le réinstaller plus tard | `sudo apt remove sentinel` |
+| Retirer Sentinel **et tout effacer** : visages, mot de passe conservé, clé de chiffrement | `sudo apt purge sentinel` |
+
+### Étapes
+
+1. **Ouvrez un terminal et tapez la commande choisie**, par exemple :
+
+   ```bash
+   sudo apt purge sentinel
+   ```
+   Confirmez avec `O` (ou `Y` sur un système en anglais). Sentinel peut encore vous
+   reconnaître pour cette dernière commande `sudo` : c'est normal.
+
+2. **Redémarrez le PC**, ou au moins fermez puis rouvrez votre session. L'écran de
+   connexion et l'écran de verrouillage retrouvent alors leur apparence d'origine,
+   sans bouton clé.
+
+3. **Vérifiez** que tout est revenu comme avant :
+
+   ```bash
+   sudo -k && sudo true
+   ```
+   Votre mot de passe doit être demandé, sans message « Sentinel ».
+
+### Ce qui se passe pendant la désinstallation
+
+1. La configuration de sécurité du système (PAM) de `sudo` et de l'écran de connexion
+   est remise **dans son état d'origine**, à l'identique, **avant** la suppression du
+   moindre fichier. À aucun moment `sudo` ou l'écran de connexion ne se retrouvent
+   bloqués.
+2. Le service Sentinel est arrêté, puis le programme, les modèles d'IA et l'extension
+   sont supprimés.
+3. Selon la commande :
+
+| | `apt remove` | `apt purge` |
+|---|---|---|
+| Programme, service, extension, réglages de l'écran de connexion | supprimés | supprimés |
+| Empreintes des visages, mot de passe conservé | **conservés** (chiffrés, réservés à root) | **effacés** |
+| Clé de chiffrement (puce TPM ou fichier) | **conservée** | **effacée** |
+| Fichiers de configuration de Sentinel | conservés | effacés |
+
+Après un `apt remove`, réinstaller le paquet retrouve vos visages et vos réglages. Vous
+pouvez aussi tout effacer plus tard avec `sudo apt purge sentinel`, même après un
+`remove`.
+
+**Facultatif :** GNOME garde le nom de l'extension dans votre liste d'extensions, ce qui
+est sans effet une fois Sentinel retiré. Pour l'en retirer aussi :
+
+```bash
+gsettings set org.gnome.shell enabled-extensions "$(gsettings get org.gnome.shell enabled-extensions | sed "s/, 'sentinel@tiburce-kay.github.io'//")"
+```
 
 ## 9. En cas de problème
 
