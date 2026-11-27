@@ -137,3 +137,15 @@ def test_coffre_illisible_rien_n_est_modifie(env):
     P(env, "key").write_bytes(P(env, "true").read_bytes())
     code, out = run(env, FAIL_DECRYPT="1", TPM2="1")
     assert code != 0 and P(env, "cred").read_bytes() == before and P(env, "key").exists()
+
+
+def test_systemd_trop_ancien_cle_gardee_dans_le_fichier(env):
+    """Ubuntu 22.04 (systemd 249, sans systemd-creds encrypt) : rien n'est chiffré ni
+    effacé, le service garde sa clé dans le fichier root."""
+    (Path(env["_root"]) / "bin" / "systemd-creds").write_text("#!/bin/sh\necho 'decrypt'\n")
+    P(env, "key").write_bytes(P(env, "true").read_bytes())
+    code, out = run(env)
+    assert code == 0, out
+    assert "systemd < 250" in out
+    assert P(env, "key").read_bytes() == P(env, "true").read_bytes()
+    assert not P(env, "cred").exists() and not P(env, "dropin").exists()
