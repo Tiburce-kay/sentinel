@@ -235,6 +235,23 @@ class SwitchRow:
     def set_active(self, value: bool) -> None:
         (self._switch or self.row).set_active(value)
 
+    def disable(self, subtitle: str) -> None:
+        """Option indisponible sur ce système : éteinte, grisée, avec l'explication."""
+        self.set_active(False)
+        self.row.set_sensitive(False)
+        self.row.set_subtitle(subtitle)
+
+
+def screen_supported() -> bool:
+    """Écran de connexion et de verrouillage par le visage : GNOME (GDM) seulement.
+    Sur un autre écran de connexion (LightDM, SDDM…), Sentinel sert à sudo."""
+    from pathlib import Path
+    return Path("/etc/pam.d/gdm-password").exists()
+
+
+SCREEN_UNSUPPORTED = ("Disponible avec l'écran de connexion de GNOME (GDM). Ce PC en utilise "
+                      "un autre : le visage sert ici aux commandes administrateur.")
+
 
 class PasswordRow:
     """Saisie de mot de passe : Adw.PasswordEntryRow (1.2+) ou Gtk.PasswordEntry dans une ligne."""
@@ -485,6 +502,10 @@ class Wizard(Adw.ApplicationWindow):
                                    "devant votre visage.", active=False)
         for row in (self.use_sudo, self.use_lock, self.use_login):
             uses.add(row.row)
+        self.screen_ok = screen_supported()
+        if not self.screen_ok:
+            self.use_lock.disable(SCREEN_UNSUPPORTED)
+            self.use_login.disable(SCREEN_UNSUPPORTED)
         box.append(uses)
         self.confirm_group = confirm = Adw.PreferencesGroup(
             title="Confirmation",
@@ -579,8 +600,9 @@ class Wizard(Adw.ApplicationWindow):
             self.settings_button.set_visible(bool(enrolled))
             uses = status.get("uses", {})
             self.use_sudo.set_active(uses.get("sudo", True))
-            self.use_lock.set_active(uses.get("lockscreen", True))
-            self.use_login.set_active(uses.get("login", False))
+            if self.screen_ok:
+                self.use_lock.set_active(uses.get("lockscreen", True))
+                self.use_login.set_active(uses.get("login", False))
         in_thread(work, done)
 
     def _start_capture(self) -> None:

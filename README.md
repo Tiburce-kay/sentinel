@@ -43,10 +43,22 @@ famille Debian — puis double-cliquez dessus, ou :
 sudo apt install ./sentinel_0.2.2-1_amd64.deb
 ```
 
-**Configuration minimale :** Ubuntu 22.04 ou Debian 12, ou plus récent (Kali, Linux Mint 21+,
-Zorin 17+, Pop!_OS 22.04+…), processeur 64 bits, bureau GNOME, webcam. Sur un système plus
-ancien, `apt` refuse l'installation. Le paquet embarque son propre Python et ses
-bibliothèques d'IA : il ne dépend pas de la version de Python de la distribution.
+**Configuration requise :** PC 64 bits (amd64), webcam, systemd comme système de
+démarrage, et une distribution de la famille Debian **au moins aussi récente qu'Ubuntu
+22.04 ou Debian 12**. Sur un système plus ancien ou un processeur ARM, `apt` refuse
+l'installation. Le paquet embarque son propre Python et ses bibliothèques d'IA : il ne
+dépend pas de la version de Python de la distribution.
+
+Ce qui fonctionne dépend du bureau :
+
+| Système | `sudo` | Écran de verrouillage et connexion | Champ du mot de passe masqué, bouton clé | Clé dans la puce TPM |
+|---|---|---|---|---|
+| Ubuntu 24.04+, Debian 13, Kali — GNOME 45 et plus | ✅ | ✅ | ✅ | ✅ si TPM 2.0 |
+| Ubuntu 22.04, Debian 12, Zorin 17 — GNOME 42 à 44 | ✅ | ✅ | ❌ champ visible pendant la vérification | Debian 12 ✅ ; Ubuntu 22.04 ❌ (systemd 249 : clé dans un fichier réservé à root) |
+| Linux Mint, Xfce, KDE, COSMIC — autre écran de connexion que GDM | ✅ | ❌ (options grisées dans l'assistant) | — | selon la base |
+
+Dans tous les cas, le mot de passe reste utilisable : webcam absente ou en panne, pièce
+sombre, visage non reconnu, service arrêté.
 
 Lancez ensuite **Sentinel** depuis le menu des applications : l'assistant enregistre votre
 visage, puis active la reconnaissance pour `sudo` et l'écran de connexion (mot de passe

@@ -130,7 +130,8 @@ Description: authentification faciale locale, résistante à l'usurpation
  par reconnaissance faciale, avec une webcam ordinaire : détection du vivant par
  IA, défi adaptatif (tourner la tête) et contrôle du relief 3D contre les photos
  et vidéos. Tout reste sur la machine : service sans accès réseau, aucune image
- conservée, empreintes chiffrées dont la clé est scellée dans la puce TPM 2.0.
+ conservée, empreintes chiffrées dont la clé est scellée dans la puce TPM 2.0
+ quand le PC en a une (systemd 250 ou plus récent).
  Le mot de passe reste toujours utilisable.
 CTRL
 

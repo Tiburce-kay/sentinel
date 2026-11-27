@@ -92,3 +92,106 @@ def test_exposition_reglee():
     assert not exposure_settled([10, 40, 90, 120, 121], 5)         # encore en train de monter
     assert exposure_settled([10, 40, 90, 120, 121, 122, 121], 5)    # stable
     assert not exposure_settled([120, 121, 121], 5)                 # trop peu d'images
+
+
+# --- choix parmi plusieurs webcams -------------------------------------------------
+
+def _fake_sysfs(tmp_path, cams):
+    """cams : liste de (nœud, nom, usb_id, index). Arborescence sysfs minimale."""
+    import os
+    root = tmp_path / "v4l"
+    root.mkdir()
+    for node, name, usb_id, index in cams:
+        usb = tmp_path / "usb" / node
+        (usb / "intf" / "drv").mkdir(parents=True)
+        vid, pid = usb_id.split(":")
+        (usb / "idVendor").write_text(vid)
+        (usb / "idProduct").write_text(pid)
+        drv = tmp_path / "drivers" / "uvcvideo"
+        drv.mkdir(parents=True, exist_ok=True)
+        os.symlink(drv, usb / "intf" / "driver")
+        d = root / node
+        d.mkdir()
+        (d / "name").write_text(name)
+        (d / "index").write_text(str(index))
+        os.symlink(usb / "intf", d / "device")
+    return root
+
+
+def test_infrarouge_en_dernier_et_metadonnees_ignorees(tmp_path):
+    from sentinel.camera import candidate_cameras
+    root = _fake_sysfs(tmp_path, [("video0", "Integrated IR Camera", "0bda:5520", 0),
+                                  ("video1", "Integrated IR Camera", "0bda:5520", 1),
+                                  ("video2", "Integrated Camera", "0bda:5521", 0)])
+    order = [c.node for c in candidate_cameras("auto", True, sysfs=root)]
+    assert order == ["video2", "video0"]
+
+
+def test_camera_de_l_enrolement_en_tete(tmp_path):
+    from sentinel.camera import candidate_cameras
+    root = _fake_sysfs(tmp_path, [("video0", "USB Webcam", "046d:0825", 0),
+                                  ("video2", "Integrated Camera", "04f2:b5ab", 0)])
+    cams = candidate_cameras("auto", True, sysfs=root)
+    integrated = next(c for c in cams if c.node == "video2")
+    order = [c.node for c in candidate_cameras("auto", True, integrated.identity, sysfs=root)]
+    assert order == ["video2", "video0"]
+
+
+class _Opened:
+    def __init__(self, info, opens=True, color=True):
+        self.info, self._opens, self._color, self.color, self.closed = info, opens, color, None, False
+
+    def __enter__(self):
+        from sentinel.camera import CameraError
+        if not self._opens:
+            raise CameraError(f"impossible d'ouvrir {self.info.device}")
+        self.color = self._color
+        return self
+
+    def __exit__(self, *a):
+        self.closed = True
+
+
+def test_webcam_en_panne_on_passe_a_la_suivante(tmp_path, monkeypatch):
+    from sentinel import camera as cm
+    from sentinel.config import CameraConfig
+    root = _fake_sysfs(tmp_path, [("video0", "Webcam A", "1111:0001", 0), ("video2", "Webcam B", "2222:0002", 0)])
+    monkeypatch.setattr(cm, "SYSFS_V4L", root)
+    monkeypatch.setattr(cm, "list_cameras", lambda sysfs=root: cm.__dict__["_list"](root))
+    behaviour = {"video0": dict(opens=False), "video2": {}}
+    cam = cm.open_camera(CameraConfig(), factory=lambda i: _Opened(i, **behaviour[i.node]))
+    assert cam.info.node == "video2"
+
+
+def test_niveaux_de_gris_garde_en_dernier_recours(tmp_path, monkeypatch):
+    from sentinel import camera as cm
+    from sentinel.config import CameraConfig
+    root = _fake_sysfs(tmp_path, [("video0", "Cam X", "1111:0001", 0), ("video2", "Cam Y", "2222:0002", 0)])
+    monkeypatch.setattr(cm, "list_cameras", lambda sysfs=root: cm.__dict__["_list"](root))
+    made = {}
+    def factory(i):
+        made[i.node] = _Opened(i, color=(i.node == "video2"))
+        return made[i.node]
+    assert cm.open_camera(CameraConfig(), factory=factory).info.node == "video2"
+    assert made["video0"].closed
+    only_grey = cm.open_camera(CameraConfig(), factory=lambda i: _Opened(i, color=False))
+    assert only_grey.color is False
+
+
+def test_aucune_webcam_ne_repond(tmp_path, monkeypatch):
+    import pytest
+    from sentinel import camera as cm
+    from sentinel.config import CameraConfig
+    root = _fake_sysfs(tmp_path, [("video0", "Cam X", "1111:0001", 0)])
+    monkeypatch.setattr(cm, "list_cameras", lambda sysfs=root: cm.__dict__["_list"](root))
+    with pytest.raises(cm.CameraError):
+        cm.open_camera(CameraConfig(), factory=lambda i: _Opened(i, opens=False))
+
+
+def test_detection_couleur():
+    import numpy as np
+    from sentinel.camera import is_color
+    grey = np.repeat(np.random.default_rng(0).integers(0, 255, (48, 64, 1), dtype=np.uint8), 3, axis=2)
+    colour = grey.copy()
+    colour[..., 2] = 255 - colour[..., 2]
+    assert not is_color(grey) and is_color(colour)

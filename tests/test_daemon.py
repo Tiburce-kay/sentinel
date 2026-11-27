@@ -52,7 +52,7 @@ def service(tmp_path, monkeypatch):
     state = d.State(cfg, engine)
     state.store.init()
     state.scenes = enrollment_scenes()
-    state.open_camera = lambda: FakeCamera(state.scenes)
+    state.open_camera = lambda *a: FakeCamera(state.scenes)
     # Appelant simulé : un utilisateur ordinaire, quel que soit l'utilisateur qui lance
     # les tests (en conteneur, c'est root, à qui le service accorde tout).
     monkeypatch.setattr(d, "peer_of", lambda sock: FakePeer(os.getpid(), 4242, 4242))

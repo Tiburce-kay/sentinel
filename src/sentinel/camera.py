@@ -96,13 +96,31 @@ def list_cameras(sysfs: Path = SYSFS_V4L) -> list[CameraInfo]:
     return [describe(p) for p in nodes]
 
 
-def select_camera(device: str, require_uvc: bool, sysfs: Path = SYSFS_V4L) -> CameraInfo:
+_list = list_cameras
+
+_IR_NAME = re.compile(r"(\bIR\b|infra ?red)", re.IGNORECASE)
+
+
+def looks_infrared(cam: CameraInfo) -> bool:
+    """Caméra infrarouge (PC compatibles Windows Hello) : à ne pas choisir d'office."""
+    return bool(_IR_NAME.search(cam.name))
+
+
+def candidate_cameras(device: str, require_uvc: bool, prefer_identity: str | None = None,
+                      sysfs: Path = SYSFS_V4L) -> list[CameraInfo]:
+    """Caméras à essayer, dans l'ordre.
+
+    « auto » : toutes les webcams USB (flux vidéo, pas les nœuds de métadonnées) ; en
+    tête celle de l'enrôlement, puis les caméras couleur, les infrarouges en dernier.
+    Un chemin /dev/videoN : cette caméra seule.
+    """
     cams = list_cameras(sysfs)
     if device == "auto":
-        candidates = [c for c in cams if c.index == 0 and (c.is_uvc or not require_uvc)]
-        if not candidates:
+        found = [c for c in cams if c.index == 0 and (c.is_uvc or not require_uvc)]
+        if not found:
             raise CameraError("aucune webcam utilisable trouvée")
-        return candidates[0]
+        return sorted(found, key=lambda c: (c.identity != prefer_identity if prefer_identity else 0,
+                                            looks_infrared(c)))
     node = Path(device).name
     for cam in cams:
         if cam.node == node:
@@ -110,8 +128,43 @@ def select_camera(device: str, require_uvc: bool, sysfs: Path = SYSFS_V4L) -> Ca
                 raise CameraError(
                     f"{cam.device} n'est pas une webcam USB physique (pilote « {cam.driver or 'aucun'} ») : refusée"
                 )
-            return cam
+            return [cam]
     raise CameraError(f"caméra introuvable : {device}")
+
+
+def select_camera(device: str, require_uvc: bool, sysfs: Path = SYSFS_V4L) -> CameraInfo:
+    return candidate_cameras(device, require_uvc, sysfs=sysfs)[0]
+
+
+def open_camera(cfg, prefer_identity: str | None = None, factory=None) -> "Camera":
+    """Ouvre la première caméra qui fonctionne et filme en couleur (voir candidate_cameras).
+
+    Une webcam débranchée, occupée ou muette, ou une caméra infrarouge, est passée :
+    on essaie la suivante. Renvoie une caméra déjà ouverte (utilisable avec « with »).
+    """
+    make = factory or (lambda info: Camera(info, cfg.width, cfg.height, cfg.warmup_frames, cfg.warmup_max_s))
+    errors = []
+    fallback = None
+    for info in candidate_cameras(cfg.device, cfg.require_uvc, prefer_identity):
+        cam = make(info)
+        try:
+            cam.__enter__()
+        except CameraError as exc:
+            errors.append(str(exc))
+            continue
+        if cam.color is False and cfg.device == "auto":
+            # Image en niveaux de gris : sans doute infrarouge. Gardée en dernier recours.
+            if fallback is None:
+                fallback = cam
+            else:
+                cam.__exit__(None, None, None)
+            continue
+        if fallback is not None:
+            fallback.__exit__(None, None, None)
+        return cam
+    if fallback is not None:
+        return fallback
+    raise CameraError(errors[0] if len(errors) == 1 else "aucune webcam ne répond : " + " ; ".join(errors))
 
 
 def exposure_settled(levels: list[float], min_frames: int, tolerance: float = 3.0) -> bool:
@@ -123,6 +176,14 @@ def exposure_settled(levels: list[float], min_frames: int, tolerance: float = 3.
     return max(last) - min(last) <= tolerance
 
 
+def is_color(frame) -> bool:
+    """Image en couleur ? Une caméra infrarouge livre trois canaux identiques."""
+    if frame.ndim < 3 or frame.shape[2] < 3:
+        return False
+    small = frame[::8, ::8].astype(np.int16)
+    return bool(np.abs(small[..., 0] - small[..., 1]).max() > 2 or np.abs(small[..., 1] - small[..., 2]).max() > 2)
+
+
 class Camera:
     """Flux d'images BGR depuis une webcam. Utilisable avec « with »."""
 
@@ -132,8 +193,12 @@ class Camera:
         self._width, self._height, self._warmup = width, height, warmup
         self._warmup_max_s = warmup_max_s
         self._cap = None
+        # Couleur (True), niveaux de gris (False, caméra infrarouge) ou inconnu (None).
+        self.color: bool | None = None
 
     def __enter__(self) -> "Camera":
+        if self._cap is not None:  # déjà ouverte par open_camera
+            return self
         import cv2
 
         cap = cv2.VideoCapture(self.info.device, cv2.CAP_V4L2)
@@ -146,13 +211,20 @@ class Camera:
         # Caméra « froide » (écran de connexion…) : les premières images sont mal
         # exposées et trompent la détection du vivant. On attend une luminosité stable.
         levels: list[float] = []
+        last = None
         deadline = time.monotonic() + self._warmup_max_s
         while time.monotonic() < deadline:
             ok, frame = cap.read()
             if ok and frame is not None:
                 levels.append(float(frame[::16, ::16].mean()))
+                last = frame
             if exposure_settled(levels, self._warmup):
                 break
+        if last is None:
+            cap.release()
+            self._cap = None
+            raise CameraError(f"{self.info.device} ne renvoie aucune image")
+        self.color = is_color(last)
         return self
 
     def __exit__(self, *exc) -> None:

@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 
 from .auth import Engine, Status
-from .camera import Camera, CameraError, FrameGrabber, select_camera
+from .camera import Camera, CameraError, FrameGrabber, open_camera
 from .config import Config, load_config
 from .enrollment import EnrollmentSession
 from .peer import Peer, in_active_local_session, peer_of, user_has_session
@@ -85,9 +85,8 @@ class State:
             self.engine = Engine(c, Detector(c.models_dir), Recognizer(c.models_dir), live)
         return self.engine
 
-    def open_camera(self) -> Camera:
-        c = self.cfg.camera
-        return Camera(select_camera(c.device, c.require_uvc), c.width, c.height, c.warmup_frames, c.warmup_max_s)
+    def open_camera(self, prefer_identity: str | None = None) -> Camera:
+        return open_camera(self.cfg.camera, prefer_identity)
 
     # --- Politique de mot de passe ----------------------------------------------
 
@@ -276,7 +275,7 @@ class Handler(socketserver.StreamRequestHandler):
                 # Prévient le client (module PAM) juste avant d'allumer la caméra :
                 # « regardez la caméra » ne s'affiche que si elle sert vraiment.
                 self.send({"event": "camera"})
-            with st.open_camera() as cam:
+            with st.open_camera(enr.camera or None) as cam:
                 if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
                     raise Refused("camera", "caméra différente de celle de l'enrôlement")
                 def challenge(message: str) -> None:
@@ -412,7 +411,7 @@ class Handler(socketserver.StreamRequestHandler):
         if not st.camera_lock.acquire(blocking=False):
             raise Refused("busy", "caméra déjà utilisée par Sentinel")
         try:
-            with st.open_camera() as cam:
+            with st.open_camera(self.pending.get("camera")) as cam:
                 res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), out.embeddings,
                                                    out.liveness_threshold, out.stats.get("reference_pose"))
         finally:

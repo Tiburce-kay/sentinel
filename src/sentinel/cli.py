@@ -9,7 +9,7 @@ import pwd
 import sys
 
 from . import __version__
-from .camera import Camera, CameraError, list_cameras, select_camera
+from .camera import Camera, CameraError, list_cameras, looks_infrared, open_camera, select_camera
 from .config import Config, ConfigError, load_config
 from .models import ModelError, load_verified, manifest
 from .store import StoreError, TemplateStore, Enrollment, validate_username
@@ -30,9 +30,8 @@ def _engine(cfg: Config):
     return Engine(cfg, Detector(cfg.models_dir), Recognizer(cfg.models_dir), live)
 
 
-def _camera(cfg: Config):
-    info = select_camera(cfg.camera.device, cfg.camera.require_uvc)
-    return Camera(info, cfg.camera.width, cfg.camera.height, cfg.camera.warmup_frames, cfg.camera.warmup_max_s)
+def _camera(cfg: Config, prefer_identity: str | None = None):
+    return open_camera(cfg.camera, prefer_identity)
 
 
 def cmd_init(cfg: Config, args) -> int:
@@ -64,7 +63,7 @@ def cmd_doctor(cfg: Config, args) -> int:
         line(False, "aucune caméra détectée")
     for c in cams:
         kind = "webcam USB" if c.is_uvc else f"NON USB (pilote {c.driver or 'aucun'}) : refusée"
-        role = "flux vidéo" if c.index == 0 else "métadonnées"
+        role = ("flux vidéo" if c.index == 0 else "métadonnées") + (", infrarouge" if looks_infrared(c) else "")
         print(f"       {c.device:<12}{c.name}  [{c.usb_id or '-'}] {kind}, {role}")
     try:
         chosen = select_camera(cfg.camera.device, cfg.camera.require_uvc)
@@ -140,7 +139,7 @@ def cmd_test(cfg: Config, args) -> int:
         print(f"Aucun visage enregistré pour « {user} ».{_no_store_hint(cfg)}")
         return 1
     engine = _engine(cfg)
-    with _camera(cfg) as cam:
+    with _camera(cfg, enr.camera or None) as cam:
         if cfg.camera.pin_identity and enr.camera and cam.info.identity != enr.camera:
             print("Refusé : ce n'est pas la caméra utilisée à l'enrôlement.")
             return 1
@@ -259,7 +258,7 @@ def cmd_campagne(cfg: Config, args) -> int:
             input(f"\nEssai {i}/{args.essais} : préparez la présentation, puis appuyez sur Entrée… ")
         except EOFError:
             return 0
-        with _camera(cfg) as cam:
+        with _camera(cfg, enr.camera or None) as cam:
             res = engine.authenticate(
                 cam.frames(cfg.auth.timeout_s + cfg.auth.challenge_timeout_s), enr.embeddings,
                 enr.liveness_threshold, enr.stats.get("reference_pose"),

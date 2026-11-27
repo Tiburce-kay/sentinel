@@ -62,14 +62,15 @@ class FakeService:
         self.sock.close()
 
 
-def run(built: Path, tmp: Path, replies, *, user="alice", service="sudo", env=None, notify=False):
+def run(built: Path, tmp: Path, replies, *, user="alice", service="sudo", env=None, notify=False,
+        then="pam_deny.so"):
     sock = tmp / "s.sock"
     conf = tmp / "conf"
     conf.mkdir(exist_ok=True)
     opt = "notify" if notify else ""
     (conf / service).write_text(
         f"auth sufficient {built}/pam_sentinel.so socket={sock} timeout=3 {opt}\n"
-        "auth required pam_deny.so\n")
+        f"auth required {then}\n")
     fake = FakeService(sock, replies) if replies is not None else None
     try:
         p = subprocess.run([str(built / "pam-harness"), str(conf), service, user],
@@ -166,12 +167,13 @@ def keyring_stack(built: Path, tmp: Path, replies, password_ok: bool):
         f"auth optional pam_exec.so expose_authtok quiet {spy}\n"
         "auth [success=done default=die] pam_permit.so\n"
         f"auth required {'pam_permit.so' if password_ok else 'pam_deny.so'}\n")
-    fake = FakeService(sock, replies)
+    fake = FakeService(sock, replies) if replies is not None else None
     try:
         p = subprocess.run([str(built / "pam-harness"), str(conf), "gdm-password", "alice"],
                            capture_output=True, text=True, timeout=15)
     finally:
-        fake.close()
+        if fake:
+            fake.close()
         sock.unlink(missing_ok=True)
     return p.stdout, (seen.read_text().rstrip("\0") if seen.exists() else None)
 
@@ -234,3 +236,31 @@ def test_defi_affiche_puis_reussi(built, tmp_path):
                                    {"ok": True, "status": "success"}])
     assert "Tournez la tête vers votre gauche" in out
     assert "résultat PAM : Success" in out
+
+
+# --- Secours : quoi qu'il arrive au visage, le mot de passe reste possible ----------
+
+SECOURS = {
+    "webcam cassée ou absente": [{"ok": False, "status": "camera", "message": "aucune webcam utilisable trouvée"}],
+    "trop sombre": [{"event": "camera"}, {"ok": False, "status": "too_dark", "message": "trop sombre"}],
+    "aucun visage": [{"event": "camera"}, {"ok": False, "status": "no_face", "message": "aucun visage"}],
+    "verrouillé après 5 échecs": [{"ok": False, "status": "locked", "message": "verrouillé"}],
+    "erreur interne du service": [{"ok": False, "status": "error", "message": "erreur interne"}],
+    "réponse illisible": ["n'importe quoi"],
+    "service arrêté": None,
+}
+
+
+@pytest.mark.parametrize("cas", SECOURS)
+def test_sudo_secours_par_mot_de_passe(built, tmp_path, cas):
+    """Pile de sudo réelle (« sufficient » puis mot de passe) : le visage échoue, le
+    mot de passe (ici pam_permit, comme un bon mot de passe) prend le relais."""
+    out, _ = run(built, tmp_path, SECOURS[cas], then="pam_permit.so")
+    assert "résultat PAM : Success" in out
+
+
+@needs_exec
+@pytest.mark.parametrize("cas", SECOURS)
+def test_ecran_de_connexion_secours_par_mot_de_passe(built, tmp_path, cas):
+    out, seen = keyring_stack(built, tmp_path, SECOURS[cas], password_ok=True)
+    assert "Success" in out and seen is None

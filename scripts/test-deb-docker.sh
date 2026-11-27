@@ -37,6 +37,10 @@ PAMMOD="$(dpkg -L sentinel | grep 'pam_sentinel.so$')"
 [ -e "$PAMMOD" ] || fail "module PAM absent"
 ok "fichiers en place (module : $PAMMOD)"
 
+echo "=== 1b. l'IA du paquet calcule vraiment sur cette distribution"
+/opt/sentinel/venv/bin/python -I /src/scripts/smoke-ia.py || fail "modèles d'IA inutilisables"
+ok "$(/opt/sentinel/venv/bin/python -I /src/scripts/smoke-ia.py)"
+
 echo "=== 2. activation et vrai sudo"
 useradd -m alice && echo 'alice:Bon-Mdp-42' | chpasswd && usermod -aG sudo alice
 sentinel-pam sync --sudo on --screen off >/dev/null || fail "sentinel-pam sync"
