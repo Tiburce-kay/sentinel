@@ -23,6 +23,7 @@ if [ "${SENTINEL_IN_CONTAINER:-}" != 1 ]; then
     repo="$(cd "$(dirname "$0")/.." && pwd)"
     mkdir -p "$repo/dist"
     exec docker run --rm -e SENTINEL_IN_CONTAINER=1 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+        -e SENTINEL_PKGVER="${SENTINEL_PKGVER:-}" \
         -v "$repo:/src:ro" -v "$repo/dist:/dist" "$image" sh /src/scripts/build-deb.sh
 fi
 
@@ -31,7 +32,8 @@ apt-get update -qq >/dev/null
 apt-get install -y -qq --no-install-recommends gcc make libpam0g-dev dpkg-dev ca-certificates curl >/dev/null
 
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' /src/pyproject.toml)"
-PKGVER="$VERSION-1"
+# Version d'essai possible : SENTINEL_PKGVER=0.3.0~essai1-1 (« ~ » : classée avant 0.3.0-1).
+PKGVER="${SENTINEL_PKGVER:-$VERSION-1}"
 W=/tmp/work
 STAGE=/tmp/stage
 rm -rf "$W" "$STAGE"
