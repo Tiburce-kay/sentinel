@@ -20,6 +20,10 @@ for image in $IMAGES; do
     scripts/test-deb-docker.sh "$image" "dist/$deb" > "$log" 2>&1
     grep -h "^RÉSULTAT" "$log" >> dist/rapport.txt || echo "RÉSULTAT PAQUET $image : ÉCHEC (voir $log)" >> dist/rapport.txt
 done
+# Écran de verrouillage de Plasma 5 (Kubuntu 22.04) : vrai kcheckpass, vrai protocole.
+scripts/test-kcheckpass-docker.sh "dist/$deb" > dist/test-kcheckpass.log 2>&1
+grep -h "^RÉSULTAT" dist/test-kcheckpass.log >> dist/rapport.txt || echo "RÉSULTAT KCHECKPASS : ÉCHEC (voir dist/test-kcheckpass.log)" >> dist/rapport.txt
+
 # Sur un PC sans GNOME (KDE…), installer Sentinel ne doit tirer ni GNOME ni GDM :
 # apt installe les recommandations par défaut (bug de la 0.2.4, signalé sous Kubuntu).
 pulled="$(docker run --rm -v "$PWD/dist:/pkg:ro" ubuntu:24.04 sh -c "apt-get update -qq >/dev/null 2>&1;

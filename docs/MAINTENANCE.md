@@ -13,6 +13,9 @@
    ```
    Chaque ligne doit indiquer `OK` :
    - `RÉSULTAT PAQUET` pour Ubuntu 22.04 et 24.04, Debian 12 et 13, et Kali ;
+   - `RÉSULTAT KCHECKPASS` : écran de verrouillage de Plasma 5, avec le vrai `kcheckpass`
+     de KDE piloté par son protocole (`scripts/kcheckpass_driver.py`) et le service réel
+     en session simulée (`scripts/sentineld_essai.py`) ;
    - `BUREAU NON TIRÉ` : aucun bureau ni écran de connexion installé avec Sentinel ;
    - `REFUS` pour Ubuntu 20.04 et Debian 11, qui doivent rester refusés.
 4. Essayer sur un vrai PC ou en machine virtuelle ce que les conteneurs ne peuvent pas
