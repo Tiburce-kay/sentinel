@@ -3,6 +3,16 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [0.2.3] — 2026-11-27
+
+### Ajouté
+- **Licence PolyForm Noncommercial 1.0.0** : usage gratuit à titre personnel, pour la
+  recherche, l'enseignement et les organismes sans but lucratif ; usage commercial sous
+  licence de l'auteur. Le texte de la licence est installé avec le paquet
+  (`/usr/share/doc/sentinel/copyright`).
+
+Aucun changement de fonctionnement par rapport à la 0.2.2.
+
 ## [0.2.2] — 2026-11-27
 
 ### Changé
@@ -70,5 +80,6 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Service `sentineld` isolé, module PAM en C, `sudo` et écran de verrouillage.
 - Assistant graphique GTK4 / libadwaita.
 
+[0.2.3]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.2
 [0.2.0]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.0

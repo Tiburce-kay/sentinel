@@ -1,6 +1,6 @@
 # Sentinel : authentification faciale locale et résistante à l'usurpation sur webcam ordinaire
 
-*Rapport technique, version 0.2.2 (novembre 2026).*
+*Rapport technique, version 0.2.3 (novembre 2026).*
 
 ## Résumé
 

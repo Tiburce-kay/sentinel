@@ -6,9 +6,10 @@ Déverrouillez `sudo`, l'écran de verrouillage et la session au démarrage en r
 votre webcam, sans caméra infrarouge, sans cloud et sans jamais perdre l'accès par mot
 de passe.
 
-![Version](https://img.shields.io/badge/version-0.2.2-blue)
+![Version](https://img.shields.io/badge/version-0.2.3-blue)
 ![Plateforme](https://img.shields.io/badge/Ubuntu%2024.04%2B%20%C2%B7%20Debian%2013%2B%20%C2%B7%20Kali-GNOME%2045%2B-orange)
 ![Tests](https://img.shields.io/badge/tests-191%20r%C3%A9ussis-brightgreen)
+![Licence](https://img.shields.io/badge/licence-PolyForm%20Noncommercial%201.0.0-lightgrey)
 
 | Accueil | Enregistrement guidé | Choix et confirmation |
 |---|---|---|
@@ -152,6 +153,19 @@ repository*).
 
 ## Licence
 
-© 2026 Tiburce-kay. Tous droits réservés tant qu'aucune licence n'est choisie. Les
-modèles et bibliothèques inclus gardent leurs licences propres (MIT, Apache-2.0, BSD,
-PSF), toutes compatibles avec un usage commercial ([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+Copyright © 2026 Tiburce-kay. Sentinel est distribué sous la licence
+**[PolyForm Noncommercial 1.0.0](LICENSE)**.
+
+| Usage | Autorisé gratuitement |
+|---|---|
+| Personnel : sur son PC, études, loisirs, recherche, essais | ✅ |
+| Établissements d'enseignement, organismes de recherche publics, associations, administrations | ✅ |
+| Modifier le code et partager ses modifications, sans but commercial et en conservant la licence et la mention de l'auteur | ✅ |
+| **Usage commercial** : entreprise (y compris en interne), produit ou service vendu, intégration dans une offre payante | ❌ **licence commerciale à obtenir auprès de l'auteur** |
+
+Pour une licence commerciale, ouvrez un ticket intitulé « Licence commerciale » sur ce
+dépôt, ou contactez l'auteur via son [profil GitHub](https://github.com/Tiburce-kay).
+
+Ce tableau est un résumé : seul le texte de la licence ([LICENSE](LICENSE)) fait foi.
+Les modèles et bibliothèques inclus gardent leurs licences propres (MIT, Apache-2.0,
+BSD, PSF) : voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

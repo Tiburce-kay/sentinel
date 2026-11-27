@@ -30,12 +30,14 @@ echo "=== 1. installation du paquet (apt résout les dépendances)"
 apt-get install -y "$DEB" > /tmp/apt.log 2>&1 || { tail -20 /tmp/apt.log; fail "installation"; }
 ok "$(sentinel --version)"
 for f in /usr/sbin/sentinel-pam /usr/bin/sentinel-setup /usr/lib/systemd/system/sentineld.service \
-         /etc/pam.d/sentinel-confirm /usr/share/sentinel/models/face_recognition_sface_2021dec.onnx; do
+         /etc/pam.d/sentinel-confirm /usr/share/sentinel/models/face_recognition_sface_2021dec.onnx \
+         /usr/share/doc/sentinel/copyright; do
     [ -e "$f" ] || fail "fichier manquant : $f"
 done
 PAMMOD="$(dpkg -L sentinel | grep 'pam_sentinel.so$')"
 [ -e "$PAMMOD" ] || fail "module PAM absent"
-ok "fichiers en place (module : $PAMMOD)"
+grep -q "PolyForm Noncommercial License 1.0.0" /usr/share/doc/sentinel/copyright || fail "licence absente du paquet"
+ok "fichiers en place, licence comprise (module : $PAMMOD)"
 
 echo "=== 1b. l'IA du paquet calcule vraiment sur cette distribution"
 /opt/sentinel/venv/bin/python -I /src/scripts/smoke-ia.py || fail "modèles d'IA inutilisables"

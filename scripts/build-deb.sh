@@ -36,7 +36,7 @@ W=/tmp/work
 STAGE=/tmp/stage
 rm -rf "$W" "$STAGE"
 mkdir -p "$W" "$STAGE/DEBIAN"
-cp -r /src/pyproject.toml /src/README.md /src/src /src/pam /src/packaging /src/scripts "$W/"
+cp -r /src/pyproject.toml /src/README.md /src/LICENSE /src/src /src/pam /src/packaging /src/scripts "$W/"
 
 # Python autonome, vérifié par son empreinte, puis environnement du service.
 curl -fsSL -o /tmp/python.tar.gz "$PY_URL"
@@ -98,7 +98,12 @@ chmod 0755 "$STAGE/usr/bin/sentinel-setup"
 
 # Documentation et licences des composants tiers.
 install -D -m 0644 "$W/README.md" "$STAGE/usr/share/doc/sentinel/README.md"
+# Licence de Sentinel (PolyForm Noncommercial 1.0.0), emplacement habituel de Debian.
+install -m 0644 "$W/LICENSE" "$STAGE/usr/share/doc/sentinel/copyright"
 cat > "$STAGE/usr/share/doc/sentinel/THIRD-PARTY" <<'TXT'
+Sentinel : Copyright (c) 2026 Tiburce-kay, licence PolyForm Noncommercial 1.0.0 (voir copyright).
+Usage commercial : licence à obtenir auprès de l'auteur.
+
 Modèles d'IA inclus :
   YuNet (OpenCV Zoo, Shiqi Yu)                       licence MIT
   SFace (OpenCV Zoo)                                 licence Apache-2.0

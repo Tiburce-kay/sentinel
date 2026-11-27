@@ -65,6 +65,14 @@ du dépôt. Il n'installe que les paquets manquants, et s'arrête si des paquets
 seraient mis à jour ou retirés. Retrait : `sudo scripts/uninstall.sh`. Les utilisateurs
 passent par le paquet `.deb` ([docs/INSTALLATION.md](docs/INSTALLATION.md)).
 
+## Licence des contributions
+
+Sentinel est distribué sous [PolyForm Noncommercial 1.0.0](LICENSE), et l'auteur
+propose des licences commerciales. Pour que cela reste possible, toute contribution
+(code, documentation, modèles) suppose la signature d'un **accord de contribution**
+(CLA). Celui-ci laisse à l'auteur le droit de distribuer la contribution sous ces deux
+formes. Merci de le demander avant d'ouvrir une demande de fusion.
+
 ## Règles du projet
 
 - **Le mot de passe doit toujours rester possible** : tout changement touchant PAM doit

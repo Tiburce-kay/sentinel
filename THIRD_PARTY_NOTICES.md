@@ -26,4 +26,6 @@ licences ; un résumé de cette liste y est installé (`/usr/share/doc/sentinel/
 Linux-PAM, systemd, GTK 4, libadwaita, PyGObject, GNOME Shell et GDM sont fournis par
 la distribution et gardent leurs propres licences.
 
-Toutes les licences des composants inclus autorisent un usage commercial.
+Toutes les licences des composants inclus autorisent un usage commercial. Sentinel
+lui-même est distribué sous [PolyForm Noncommercial 1.0.0](LICENSE) : son usage
+commercial demande une licence de l'auteur.
