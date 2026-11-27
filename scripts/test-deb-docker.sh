@@ -48,6 +48,12 @@ su alice -c "echo Bon-Mdp-42 | sudo -S -k -p '' true" 2>/dev/null || fail "sudo,
 su alice -c "echo faux | sudo -S -k -p '' true" 2>/dev/null && fail "sudo a accepté un mauvais mot de passe"
 ok "sudo : bon mot de passe accepté, mauvais refusé"
 
+echo "=== 2b. mise à jour (réinstallation du paquet) : Sentinel reste actif"
+apt-get install --reinstall -y "$DEB" > /tmp/up.log 2>&1 || { tail -20 /tmp/up.log; fail "réinstallation"; }
+[ "$(grep -c pam_sentinel /etc/pam.d/sudo)" = 2 ] || fail "mise à jour : Sentinel désactivé dans PAM"
+su alice -c "echo Bon-Mdp-42 | sudo -S -k -p '' true" 2>/dev/null || fail "sudo après mise à jour"
+ok "après mise à jour : toujours activé dans PAM, sudo fonctionne"
+
 echo "=== 3. assistant graphique"
 GTK_IM_MODULE=gtk-im-context-simple GSK_RENDERER=cairo GDK_BACKEND=x11 timeout 60 \
     xvfb-run -a -s "-screen 0 1280x1024x24" sentinel-setup --demo --snapshot /tmp/snap > /tmp/gui.log 2>&1 || true
