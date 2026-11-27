@@ -177,3 +177,25 @@ def test_mauvaise_cle_du_coffre_refusee(tmp_path):
     (cred / "sentinel-master-key").write_bytes(_os.urandom(32))
     with pytest.raises(TamperedError):
         TemplateStore(tmp_path / "store", strict_permissions=False, credentials_dir=cred).load("alice")
+
+
+def test_jamais_de_nouvelle_cle_si_des_gabarits_existent(tmp_path):
+    """Incident réel : service redémarré sans accès au coffre -> nouvelle clé créée ->
+    gabarits illisibles. La clé ne peut naître que sur un stockage vierge."""
+    s = TemplateStore(tmp_path / "store", strict_permissions=False)
+    s.init()
+    s.save(Enrollment("alice", emb()))
+    s.key_path.unlink()                 # clé « partie au coffre », non fournie au service
+    s.init()
+    assert not s.key_path.exists()      # aucune clé inventée
+    with pytest.raises(StoreError, match="introuvable"):
+        s.load("alice")
+
+
+def test_jamais_de_nouvelle_cle_si_le_coffre_existe(tmp_path, monkeypatch):
+    vault = tmp_path / "coffre"
+    vault.write_bytes(b"chiffre")
+    monkeypatch.setattr(TemplateStore, "VAULT_FILE", vault)
+    s = TemplateStore(tmp_path / "store", strict_permissions=False)
+    s.init()
+    assert not s.key_path.exists()

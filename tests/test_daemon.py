@@ -305,3 +305,18 @@ def test_controle_de_sante_reserve_a_root(service, monkeypatch):
     with service.client() as c:
         r = c.call("health")
     assert r == {"ok": True, "users": 1, "key": "fichier"}
+
+
+def test_gabarit_illisible_signale_sans_bloquer(service):
+    enroll(service)
+    path = service.store.users_dir / "alice.tpl"
+    raw = bytearray(path.read_bytes())
+    raw[-10] ^= 1
+    path.write_bytes(bytes(raw))
+    with service.client() as c:
+        st = c.call("status")
+    assert st["ok"] and not st["enrolled"] and st["damaged"]
+    enroll(service)                      # le réenregistrement remplace le gabarit abîmé
+    with service.client() as c:
+        st = c.call("status")
+    assert st["enrolled"] and not st["damaged"]

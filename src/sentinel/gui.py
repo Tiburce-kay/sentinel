@@ -560,6 +560,15 @@ class Wizard(Adw.ApplicationWindow):
                 self.welcome_state.set_label(status.get("message", "Accès refusé"))
                 return
             enrolled = status.get("enrolled")
+            if status.get("damaged"):
+                self.welcome_state.set_label(
+                    f"Compte : {hello.get('user')}. Votre enregistrement précédent est illisible : "
+                    "enregistrez à nouveau votre visage (30 secondes).")
+                self.start_button.set_label("Enregistrer mon visage")
+                self.start_button.set_sensitive(True)
+                self.remove_button.set_visible(False)
+                self.settings_button.set_visible(False)
+                return
             self.welcome_state.set_label(
                 f"Compte : {hello.get('user')}. "
                 + ("Un visage est déjà enregistré : vous pouvez le remplacer." if enrolled

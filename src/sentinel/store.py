@@ -125,7 +125,7 @@ class TemplateStore:
         for d in (self.root, self.users_dir, self.state_dir):
             d.mkdir(mode=0o700, parents=True, exist_ok=True)
             os.chmod(d, 0o700)
-        if self.key_source == "fichier" and not self.key_path.exists():
+        if self.key_source == "fichier" and not self.key_path.exists() and self.may_create_key():
             fd = os.open(self.key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "wb") as fh:
                 fh.write(AESGCM.generate_key(bit_length=256))
@@ -145,15 +145,31 @@ class TemplateStore:
         if st.st_mode & 0o077:
             raise StoreError(f"{kind} {path} : accessible à d'autres utilisateurs (droits {oct(st.st_mode & 0o777)})")
 
+    # Clé chiffrée par le coffre de systemd, posée par l'installation (voir protect-key.sh).
+    VAULT_FILE = Path("/etc/credstore.encrypted/sentinel-master-key")
+
+    def may_create_key(self) -> bool:
+        """Une NOUVELLE clé ne peut être créée que sur un stockage vierge. S'il existe
+        déjà des gabarits, ou une clé dans le coffre de systemd qui n'est simplement pas
+        encore fournie au service, en créer une autre rendrait tout illisible
+        (incident réel du 27/11 : réinstallation après désinstallation --keep-data)."""
+        if any(self.users_dir.glob("*.tpl")) or any(self.users_dir.glob("*.authtok")):
+            return False
+        return not self.VAULT_FILE.exists()
+
     def check_permissions(self) -> None:
         if not self.root.exists():
             raise StoreError(f"{self.root} n'existe pas : lancer « sentinel init »")
         for d in (self.root, self.users_dir, self.state_dir):
             self._check(d, is_dir=True)
-        if self.key_source == "fichier":
+        # Clé absente : pas une erreur ici (le coffre peut ne pas encore être relié) ;
+        # toute lecture ou écriture de gabarit échouera alors clairement (_key).
+        if self.key_source == "fichier" and self.key_path.exists():
             self._check(self.key_path, is_dir=False)
 
     def _key(self) -> bytes:
+        if self.key_source == "fichier" and not self.key_path.exists():
+            raise StoreError("clé de chiffrement introuvable : relancez l'installation de Sentinel")
         if self.key_source == "coffre":
             key = self.credential_path.read_bytes()  # répertoire géré par systemd (root, 0400)
         else:

@@ -217,8 +217,14 @@ class Handler(socketserver.StreamRequestHandler):
     def op_status(self, req: dict) -> None:
         user = self._user(req)
         st = self.state
-        enr = st.store.load(user)
-        self.send({"ok": True, "user": user, "enrolled": enr is not None,
+        try:
+            enr = st.store.load(user)
+            damaged = ""
+        except StoreError as exc:
+            # Gabarit illisible (clé perdue, fichier abîmé) : on le signale, et
+            # l'assistant propose de réenregistrer le visage au lieu de bloquer.
+            enr, damaged = None, str(exc)
+        self.send({"ok": True, "user": user, "enrolled": enr is not None, "damaged": damaged,
                    "uses": enr.uses if enr else dict(DEFAULT_USES),
                    "locked": st.store.failures(user) >= st.cfg.auth.max_failures,
                    "password_required": st.password_required(user)})
