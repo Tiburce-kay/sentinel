@@ -12,7 +12,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   contrôle attend désormais que le service réponde (jusqu'à 60 s), et s'arrête tout de
   suite si le service échoue.
 
-## [0.2.3] — 2026-11-27
+## [0.2.3] — 2026-11-27 — paquet retiré, remplacé par la 0.2.4
 
 ### Ajouté
 - **Licence PolyForm Noncommercial 1.0.0** : usage gratuit à titre personnel, pour la
@@ -100,6 +100,6 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Assistant graphique GTK4 / libadwaita.
 
 [0.2.4]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.4
-[0.2.3]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.3
+[0.2.3]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.3
 [0.2.2]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.2
 [0.2.0]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.0
