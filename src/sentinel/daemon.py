@@ -46,7 +46,7 @@ log = logging.getLogger("sentineld")
 SERVICES = {
     "sudo": "sudo", "sudo-i": "sudo", "polkit-1": "sudo",
     "gdm-password": "screen", "login": "screen", "lightdm": "screen",
-    "sddm": "screen", "kde": "screen", "gnome-screensaver": "screen",
+    "sddm": "screen", "kde": "screen", "kde-fingerprint": "screen", "gnome-screensaver": "screen",
     "sentinel-test": "test",
 }
 

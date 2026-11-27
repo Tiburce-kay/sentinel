@@ -280,3 +280,31 @@ def test_module_supprime_ligne_restee_le_mot_de_passe_marche(built, tmp_path, la
         p = subprocess.run([str(built / "pam-harness"), str(conf), layout, "alice"],
                            capture_output=True, text=True, timeout=15)
         assert ("résultat PAM : Success" in p.stdout) is expected, p.stdout
+
+
+@pytest.mark.parametrize("reply, accepted", [
+    ([{"event": "camera"}, {"ok": True, "status": "success", "message": "succès"}], True),
+    ([{"event": "camera"}, {"ok": False, "status": "no_face", "message": "aucun visage"}], False),
+    (None, False),   # service arrêté
+])
+def test_plasma6_pile_parallele_kde_fingerprint(built, tmp_path, reply, accepted):
+    """Pile parallèle de l'écran de verrouillage de Plasma 6 : un succès du visage saute
+    l'empreinte digitale ; sinon l'empreinte est essayée (ici absente, comme sur un PC
+    sans lecteur) et cette pile échoue — la pile du mot de passe, séparée, reste dispo."""
+    sock, conf = tmp_path / "s.sock", tmp_path / "conf"
+    conf.mkdir()
+    (conf / "kde-fingerprint").write_text(
+        f"auth [success=1 default=ignore] {built}/pam_sentinel.so socket={sock} timeout=3\n"
+        f"auth required {tmp_path}/absent/pam_fprintd.so\n"
+        "auth optional pam_permit.so\n")
+    fake = FakeService(sock, reply) if reply is not None else None
+    try:
+        p = subprocess.run([str(built / "pam-harness"), str(conf), "kde-fingerprint", "alice"],
+                           capture_output=True, text=True, timeout=15)
+    finally:
+        if fake:
+            fake.close()
+        sock.unlink(missing_ok=True)
+    assert ("résultat PAM : Success" in p.stdout) is accepted, p.stdout
+    if fake:
+        assert fake.requests[0]["service"] == "kde-fingerprint"

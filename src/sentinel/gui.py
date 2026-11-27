@@ -162,14 +162,16 @@ def sync_pam(sudo: bool, screen: bool) -> str:
         return "Outil d'activation introuvable : réinstallez Sentinel."
     current = json.loads(subprocess.run([tool, "status", "--json"], capture_output=True,
                                         text=True, timeout=10).stdout or "{}")
-    on = {svc: current.get(svc) == "activé" for svc in ("sudo", "gdm-password")}
+    screens = ("gdm-password", "kde", "kde-fingerprint")
+    on = {"sudo": current.get("sudo") == "activé",
+          "screen": any(current.get(svc) == "activé" for svc in screens)}
     need = {"sudo": sudo and current.get("sudo") == "désactivé",
-            "gdm-password": screen and current.get("gdm-password") == "désactivé"}
+            "screen": screen and any(current.get(svc) == "désactivé" for svc in screens)}
     if not any(need.values()):
         return ""
     r = subprocess.run(["pkexec", tool, "sync",
                         "--sudo", "on" if on["sudo"] or need["sudo"] else "off",
-                        "--screen", "on" if on["gdm-password"] or need["gdm-password"] else "off"],
+                        "--screen", "on" if on["screen"] or need["screen"] else "off"],
                        capture_output=True, text=True)
     if r.returncode in (126, 127):
         return ("Sentinel a été désactivé sur ce PC par un administrateur. Son mot de passe "
@@ -247,11 +249,16 @@ class SwitchRow:
         self.row.set_subtitle(subtitle)
 
 
-def screen_supported() -> bool:
-    """Écran de connexion et de verrouillage par le visage : GNOME (GDM) seulement.
-    Sur un autre écran de connexion (LightDM, SDDM…), Sentinel sert à sudo."""
+def screen_support() -> tuple[bool, bool]:
+    """(écran de verrouillage, connexion au démarrage) pris en charge pour le bureau en
+    cours. GNOME : les deux (GDM). KDE Plasma : l'écran de verrouillage ; la connexion
+    par SDDM viendra ensuite. Autres bureaux : aucun, Sentinel sert à sudo."""
     from pathlib import Path
-    return Path("/etc/pam.d/gdm-password").exists()
+    pam = Path("/etc/pam.d")
+    if desktop_name() == "KDE Plasma":
+        return (pam / "kde").exists(), False
+    gdm = (pam / "gdm-password").exists() and not desktop_name()
+    return gdm, gdm
 
 
 DESKTOP_NAMES = {"KDE": "KDE Plasma", "X-CINNAMON": "Cinnamon", "XFCE": "Xfce", "MATE": "MATE",
@@ -272,7 +279,11 @@ def screen_unsupported_text() -> str:
     installer GNOME (retour d'un utilisateur de Kubuntu)."""
     desk = desktop_name()
     where = f"avec {desk}" if desk else "avec votre bureau"
-    return (f"Pas encore disponible {where} : seul l'écran de connexion de GNOME est pris en "
+    if desk == "KDE Plasma":
+        return ("Pas encore disponible avec KDE Plasma : la connexion au démarrage passe par "
+                "le mot de passe. Votre visage déverrouille l'écran de verrouillage et sert "
+                "aux commandes administrateur (sudo).")
+    return (f"Pas encore disponible {where} : seuls GNOME et KDE Plasma sont pris en "
             "charge pour l'instant. Votre visage sert ici aux commandes administrateur (sudo). "
             "Aucune installation supplémentaire n'est nécessaire.")
 
@@ -526,9 +537,10 @@ class Wizard(Adw.ApplicationWindow):
                                    "devant votre visage.", active=False)
         for row in (self.use_sudo, self.use_lock, self.use_login):
             uses.add(row.row)
-        self.screen_ok = screen_supported()
-        if not self.screen_ok:
+        self.lock_ok, self.login_ok = screen_support()
+        if not self.lock_ok:
             self.use_lock.disable(screen_unsupported_text())
+        if not self.login_ok:
             self.use_login.disable(screen_unsupported_text())
         box.append(uses)
         self.confirm_group = confirm = Adw.PreferencesGroup(
@@ -624,8 +636,9 @@ class Wizard(Adw.ApplicationWindow):
             self.settings_button.set_visible(bool(enrolled))
             uses = status.get("uses", {})
             self.use_sudo.set_active(uses.get("sudo", True))
-            if self.screen_ok:
+            if self.lock_ok:
                 self.use_lock.set_active(uses.get("lockscreen", True))
+            if self.login_ok:
                 self.use_login.set_active(uses.get("login", False))
         in_thread(work, done)
 

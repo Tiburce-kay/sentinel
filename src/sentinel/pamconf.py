@@ -32,7 +32,16 @@ import sys
 from pathlib import Path
 
 MARK = "# sentinel"
-SERVICES = ("sudo", "sudo-i", "polkit-1", "gdm-password")
+SERVICES = ("sudo", "sudo-i", "polkit-1", "gdm-password", "kde", "kde-fingerprint")
+# Écran de verrouillage de KDE Plasma : « kde » (mot de passe) et, depuis Plasma 6,
+# « kde-fingerprint », lancée EN PARALLÈLE dès l'affichage de l'écran, sans attendre
+# la saisie. Avec Plasma 6, le visage prend place dans cette pile parallèle, juste
+# avant l'empreinte digitale : le mot de passe reste disponible à tout moment.
+SCREEN_SERVICES = ("gdm-password", "kde", "kde-fingerprint")
+FPRINT = re.compile(r"^\s*-?auth\s+\S+\s+pam_fprintd\.so\b")
+# Succès du visage : saute l'empreinte digitale (ligne suivante) ; échec : l'empreinte
+# est essayée comme avant.
+FINGERPRINT_LINE = f"auth\t[success=1 default=ignore]\tpam_sentinel.so\t\t{MARK}"
 PAM_DIR = Path("/etc/pam.d")
 INCLUDE = re.compile(r"^\s*@include\s+common-auth\s*$")
 FACE_LINE = f"auth\tsufficient\tpam_sentinel.so\t\t{MARK}"
@@ -80,6 +89,41 @@ def enable(text: str, keyring: bool = False) -> str:
     return "\n".join(out) + "\n"
 
 
+def enable_parallel(text: str) -> str:
+    """kde-fingerprint (Plasma 6) : visage juste avant pam_fprintd."""
+    if is_enabled(text):
+        return text
+    lines = text.splitlines()
+    idx = [i for i, line in enumerate(lines) if FPRINT.match(line)]
+    if len(idx) != 1:
+        raise PamConfError("disposition non prise en charge : « auth … pam_fprintd.so » attendu une seule fois")
+    i = idx[0]
+    return "\n".join(lines[:i] + [FINGERPRINT_LINE] + lines[i:]) + "\n"
+
+
+def enable_notify_only(text: str) -> str:
+    """kde (Plasma 6) : la pile du mot de passe ne reçoit que la ligne « mot de passe
+    correct » ; le visage est dans la pile parallèle kde-fingerprint."""
+    if is_enabled(text):
+        return text
+    lines = text.splitlines()
+    idx = [i for i, line in enumerate(lines) if INCLUDE.match(line)]
+    if len(idx) != 1:
+        raise PamConfError("disposition non prise en charge : « @include common-auth » attendu une seule fois")
+    i = idx[0]
+    return "\n".join(lines[:i + 1] + [NOTIFY_LINE] + lines[i + 1:]) + "\n"
+
+
+def layout(service: str, text: str, pam_dir: Path) -> str:
+    """Texte activé pour un service, selon sa nature."""
+    if service == "kde-fingerprint":
+        return enable_parallel(text)
+    if service == "kde" and (pam_dir / "kde-fingerprint").exists():
+        return enable_notify_only(text)
+    keyring = service in KEYRING_SERVICES and keyring_module_present()
+    return enable(text, keyring)
+
+
 def disable(text: str) -> str:
     lines = [line for line in text.splitlines() if not line.rstrip().endswith(MARK)]
     return "\n".join(lines) + "\n"
@@ -101,9 +145,8 @@ def apply(service: str, on: bool, pam_dir: Path = PAM_DIR) -> str:
     if not path.exists():
         raise PamConfError(f"{path} introuvable")
     text = path.read_text()
-    keyring = service in KEYRING_SERVICES and keyring_module_present()
     # Réactiver remplace une ancienne disposition par la disposition actuelle.
-    new = enable(disable(text), keyring) if on else disable(text)
+    new = layout(service, disable(text), pam_dir) if on else disable(text)
     if new == text:
         return "déjà activé" if on else "déjà désactivé"
     backup = path.with_name(f"{service}.sentinel-backup")
@@ -129,9 +172,10 @@ OPT_OUT = Path("/etc/sentinel/pam-desactive")
 
 
 def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR) -> dict[str, str]:
-    """Applique en une fois les choix de l'assistant : sudo (et sudo -i), écran de
-    connexion et de verrouillage (gdm-password). Les services absents sont ignorés."""
-    wanted = {"sudo": sudo, "sudo-i": sudo, "gdm-password": screen}
+    """Applique en une fois les choix de l'assistant : sudo (et sudo -i), écrans de
+    connexion et de verrouillage (GNOME : gdm-password ; KDE Plasma : kde et
+    kde-fingerprint). Les services absents sont ignorés."""
+    wanted = {"sudo": sudo, "sudo-i": sudo, **{svc: screen for svc in SCREEN_SERVICES}}
     done = {}
     for svc, on in wanted.items():
         if not (pam_dir / svc).exists():
@@ -142,6 +186,9 @@ def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR) -> dict[str, str]:
             if svc == "sudo-i":
                 # Disposition sans common-auth (ex. « @include sudo ») : couverte par sudo.
                 done[svc] = "ignoré (inclut la configuration de sudo)"
+            elif svc in ("kde", "kde-fingerprint"):
+                # Disposition KDE inattendue : on ne devine pas, l'écran reste au mot de passe.
+                done[svc] = "ignoré (disposition non prise en charge)"
             else:
                 raise
     return done

@@ -95,8 +95,8 @@ def test_synchronisation_des_choix_de_l_assistant(tmp_path):
         (tmp_path / name).write_text(text)
         (tmp_path / name).chmod(0o644)
     sync(sudo=True, screen=False, pam_dir=tmp_path)
-    assert status(tmp_path) == {"sudo": "activé", "sudo-i": "absent",
-                                "polkit-1": "absent", "gdm-password": "désactivé"}
+    assert status(tmp_path) == {"sudo": "activé", "sudo-i": "absent", "polkit-1": "absent",
+                                "gdm-password": "désactivé", "kde": "absent", "kde-fingerprint": "absent"}
     sync(sudo=False, screen=True, pam_dir=tmp_path)
     st = status(tmp_path)
     assert st["sudo"] == "désactivé" and st["gdm-password"] == "activé"
@@ -133,3 +133,68 @@ def test_desactivation_par_l_administrateur_respectee_par_les_mises_a_jour(tmp_p
     assert status(pam)["sudo"] == "désactivé"                                 # choix respecté
     assert cli("--sudo", "on", "--screen", "off") == 0                        # l'administrateur réactive
     assert status(pam)["sudo"] == "activé" and not marker.exists()
+
+
+# --- KDE Plasma : fichiers réels de Kali (Plasma 6.7, 27/11/2026) ---------------------
+
+KDE = """auth    requisite       pam_nologin.so
+auth\trequired\tpam_succeed_if.so user != root quiet_success
+@include common-auth
+auth    optional        pam_kwallet5.so
+@include common-account
+session optional        pam_kwallet5.so auto_start
+@include common-password
+"""
+KDE_FINGERPRINT = """auth    requisite       pam_nologin.so
+auth\trequired\tpam_succeed_if.so user != root quiet_success
+auth\trequired\tpam_fprintd.so
+auth    optional        pam_kwallet5.so
+@include common-account
+session optional        pam_kwallet5.so auto_start
+password required       pam_fprintd.so
+"""
+
+
+def _kde(tmp_path, fingerprint=True):
+    (tmp_path / "kde").write_text(KDE)
+    if fingerprint:
+        (tmp_path / "kde-fingerprint").write_text(KDE_FINGERPRINT)
+    return tmp_path
+
+
+def test_plasma6_visage_dans_la_pile_parallele_mot_de_passe_intact(tmp_path):
+    """Plasma 6 : visage juste avant l'empreinte digitale (pile lancée en parallèle) ;
+    la pile du mot de passe ne reçoit que la ligne « mot de passe correct »."""
+    from sentinel.pamconf import disable, sync
+    _kde(tmp_path)
+    done = sync(sudo=False, screen=True, pam_dir=tmp_path)
+    assert done["kde"] == "activé" and done["kde-fingerprint"] == "activé"
+    fp = (tmp_path / "kde-fingerprint").read_text().splitlines()
+    i = next(n for n, l in enumerate(fp) if "pam_sentinel.so" in l)
+    assert "[success=1 default=ignore]" in fp[i] and "pam_fprintd.so" in fp[i + 1]
+    kde = (tmp_path / "kde").read_text().splitlines()
+    assert [l for l in kde if "pam_sentinel" in l] == [l for l in kde if "notify" in l]   # notify seule
+    assert kde.index(next(l for l in kde if "notify" in l)) == kde.index("@include common-auth") + 1
+    sync(sudo=False, screen=False, pam_dir=tmp_path)
+    assert (tmp_path / "kde").read_text() == KDE
+    assert (tmp_path / "kde-fingerprint").read_text() == KDE_FINGERPRINT
+    assert disable(KDE) == KDE
+
+
+def test_plasma5_sans_pile_parallele_visage_avant_le_mot_de_passe(tmp_path):
+    from sentinel.pamconf import FACE_LINE, sync
+    _kde(tmp_path, fingerprint=False)
+    sync(sudo=False, screen=True, pam_dir=tmp_path)
+    kde = (tmp_path / "kde").read_text().splitlines()
+    assert kde[kde.index("@include common-auth") - 1] == FACE_LINE
+
+
+def test_disposition_kde_inattendue_ignoree_sans_bloquer_le_reste(tmp_path):
+    from sentinel.pamconf import sync
+    from tests.test_pamconf import DEBIAN_SUDO
+    (tmp_path / "sudo").write_text(DEBIAN_SUDO)
+    (tmp_path / "kde").write_text(KDE)
+    (tmp_path / "kde-fingerprint").write_text("auth required pam_unix.so\n")   # sans pam_fprintd
+    done = sync(sudo=True, screen=True, pam_dir=tmp_path)
+    assert done["sudo"] == "activé" and done["kde-fingerprint"].startswith("ignoré")
+    assert (tmp_path / "kde-fingerprint").read_text() == "auth required pam_unix.so\n"

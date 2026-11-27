@@ -3,6 +3,20 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- **Écran de verrouillage de KDE Plasma** (en cours d'essai).
+  - Plasma 6 : le visage prend place dans la pile parallèle `kde-fingerprint`, juste
+    avant l'empreinte digitale. Il se lance dès l'affichage de l'écran, et la pile du
+    mot de passe reste intacte et disponible à tout moment.
+  - Plasma 5 : le visage passe avant le mot de passe dans la pile `kde`.
+  - Une disposition KDE inattendue est ignorée, sans rien bloquer.
+  - Assistant : l'écran de verrouillage est proposé sous KDE Plasma ; la connexion au
+    démarrage (SDDM) viendra ensuite.
+- `scripts/diagnostic-bureau.sh` : diagnostic en lecture seule du bureau et de ses
+  fichiers PAM, pour préparer la prise en charge d'un nouveau bureau.
+
 ## [0.2.5] — 2026-11-27
 
 ### Corrigé
