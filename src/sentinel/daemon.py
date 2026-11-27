@@ -43,6 +43,9 @@ MAX_LINE = 64 * 1024
 log = logging.getLogger("sentineld")
 
 # Service PAM -> usage. Un service inconnu est toujours refusé.
+# Piles où le visage passe avant le mot de passe à chaque tentative (Plasma 5).
+PAUSE_SERVICES = ("kde",)
+
 SERVICES = {
     "sudo": "sudo", "sudo-i": "sudo", "polkit-1": "sudo",
     "gdm-password": "screen", "login": "screen", "lightdm": "screen",
@@ -76,6 +79,7 @@ class State:
         self.last_password: dict[str, float] = {}
         self.skip_requests: dict[str, float] = {}
         self.password_failures: dict[str, list[float]] = {}
+        self.face_paused_until: dict[tuple[str, str], float] = {}
 
     def get_engine(self) -> Engine:
         if self.engine is None:
@@ -266,6 +270,10 @@ class Handler(socketserver.StreamRequestHandler):
             raise Refused("disabled", "visage non activé pour cet usage")
         if use != "test" and st.password_required(user, enr):
             raise Refused("password_required", "mot de passe requis (premier déverrouillage)")
+        if service in PAUSE_SERVICES and st.face_paused_until.get((user, service), 0.0) > time.monotonic():
+            # Échec récent du visage sur cet écran : le mot de passe tapé est vérifié tout
+            # de suite, sans caméra (voir AuthConfig.pause_after_failure_s).
+            raise Refused("paused", "visage en pause : utilisez votre mot de passe")
         if st.store.failures(user) >= cfg.auth.max_failures:
             log.warning("tentative sur visage verrouillé user=%s service=%s", user, service)
             raise Refused("locked", Status.LOCKED.value)
@@ -291,6 +299,11 @@ class Handler(socketserver.StreamRequestHandler):
         finally:
             st.camera_lock.release()
             st.consume_skip(user)
+        if service in PAUSE_SERVICES:
+            if res.ok or res.status is Status.SKIPPED:
+                st.face_paused_until.pop((user, service), None)
+            else:
+                st.face_paused_until[(user, service)] = time.monotonic() + cfg.auth.pause_after_failure_s
         if res.ok:
             st.store.set_failures(user, 0)
         elif res.status in (Status.SPOOF, Status.NO_MATCH, Status.CHALLENGE_FAILED):

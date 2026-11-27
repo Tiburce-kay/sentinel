@@ -105,6 +105,10 @@ class AuthConfig:
     # pendant tant de secondes, ou aucun visage depuis le début de la tentative.
     challenge_timeout_s: float = 3.0
     challenge_after_s: float = 1.5   # délai avant de proposer le défi en zone grise
+    # Écran de verrouillage de Plasma 5 (service « kde ») : le visage y passe avant le mot
+    # de passe, à chaque tentative. Après un échec du visage, il est mis en pause pendant
+    # ce délai, pour que le mot de passe tapé ensuite soit vérifié sans attendre la caméra.
+    pause_after_failure_s: float = 30.0
     give_up_dark_s: float = 1.0
     give_up_no_face_s: float = 1.5
     max_yaw: float = 0.12

@@ -308,3 +308,8 @@ def test_plasma6_pile_parallele_kde_fingerprint(built, tmp_path, reply, accepted
     assert ("résultat PAM : Success" in p.stdout) is accepted, p.stdout
     if fake:
         assert fake.requests[0]["service"] == "kde-fingerprint"
+
+
+def test_visage_en_pause_silencieux_et_mot_de_passe_immediat(built, tmp_path):
+    out, _ = run(built, tmp_path, [{"ok": False, "status": "paused", "message": "pause"}], then="pam_permit.so")
+    assert "résultat PAM : Success" in out and "[message]" not in out

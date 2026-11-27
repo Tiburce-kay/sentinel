@@ -32,12 +32,16 @@ import sys
 from pathlib import Path
 
 MARK = "# sentinel"
-SERVICES = ("sudo", "sudo-i", "polkit-1", "gdm-password", "kde", "kde-fingerprint")
+SERVICES = ("sudo", "sudo-i", "polkit-1", "gdm-password", "kde", "kde-fingerprint", "sddm")
 # Écran de verrouillage de KDE Plasma : « kde » (mot de passe) et, depuis Plasma 6,
 # « kde-fingerprint », lancée EN PARALLÈLE dès l'affichage de l'écran, sans attendre
 # la saisie. Avec Plasma 6, le visage prend place dans cette pile parallèle, juste
 # avant l'empreinte digitale : le mot de passe reste disponible à tout moment.
-SCREEN_SERVICES = ("gdm-password", "kde", "kde-fingerprint")
+SCREEN_SERVICES = ("gdm-password", "kde", "kde-fingerprint", "sddm")
+# Écrans de connexion sans visage (pour l'instant) : seule la ligne « mot de passe
+# correct » y est ajoutée, pour que Sentinel sache qu'un mot de passe a été saisi depuis
+# le démarrage (règle « mot de passe au premier déverrouillage »).
+NOTIFY_ONLY_SERVICES = ("sddm",)
 FPRINT = re.compile(r"^\s*-?auth\s+\S+\s+pam_fprintd\.so\b")
 # Succès du visage : saute l'empreinte digitale (ligne suivante) ; échec : l'empreinte
 # est essayée comme avant.
@@ -142,7 +146,7 @@ def layout(service: str, text: str, pam_dir: Path) -> str:
     """Texte activé pour un service, selon sa nature."""
     if service == "kde-fingerprint":
         return enable_parallel(text)
-    if service == "kde" and (pam_dir / "kde-fingerprint").exists():
+    if service in NOTIFY_ONLY_SERVICES or (service == "kde" and (pam_dir / "kde-fingerprint").exists()):
         return enable_notify_only(text)
     keyring = service in KEYRING_SERVICES and keyring_module_present()
     return enable(text, keyring)
@@ -218,7 +222,7 @@ def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR,
             if svc == "sudo-i":
                 # Disposition sans common-auth (ex. « @include sudo ») : couverte par sudo.
                 done[svc] = "ignoré (inclut la configuration de sudo)"
-            elif svc in ("kde", "kde-fingerprint"):
+            elif svc in ("kde", "kde-fingerprint", "sddm"):
                 # Disposition KDE inattendue : on ne devine pas, l'écran reste au mot de passe.
                 done[svc] = "ignoré (disposition non prise en charge)"
             else:

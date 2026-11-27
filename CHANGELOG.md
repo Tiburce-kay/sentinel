@@ -11,6 +11,15 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   - Plasma 5 (Kubuntu 22.04) : l'écran de verrouillage utilise le service PAM `kde`, que
     la distribution ne fournit pas (PAM applique alors `other`). Sentinel le crée comme
     copie exacte de `other`, puis le supprime à la désactivation (retour d'un testeur).
+  - Plasma 5 : après un échec du visage, celui-ci est mis en pause 30 s sur cet écran,
+    pour que le mot de passe tapé ensuite soit vérifié immédiatement. L'écran de
+    Plasma 5 ne transmet le mot de passe qu'une fois : on ne peut pas savoir à l'avance
+    s'il a été tapé.
+  - Écran de connexion de KDE (SDDM) : ajout de la seule ligne « mot de passe
+    correct », jamais du visage. Sans elle, après un démarrage par SDDM, le visage était
+    refusé (« mot de passe requis ») jusqu'au premier mot de passe saisi ailleurs.
+- Refus « usurpation » avec un visage peu éclairé : le message conseille d'allumer une
+  lumière face à soi. Le refus est maintenu.
 - Journal : luminosité médiane du visage (`lumière_visage=`), pour distinguer un
   éclairage insuffisant d'une vraie tentative d'usurpation.
   - Plasma 6 : le visage prend place dans la pile parallèle `kde-fingerprint`, juste

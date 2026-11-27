@@ -197,3 +197,11 @@ def test_image_inexploitable_ne_compte_pas_comme_echec():
     from sentinel.auth import Status as S
     r = _rejecting("image floue").authenticate([Scene(ME)] * 30, T)
     assert r.status not in (S.SPOOF, S.NO_MATCH, S.CHALLENGE_FAILED)
+
+
+def test_refus_avec_visage_peu_eclaire_donne_un_conseil():
+    from sentinel.auth import AuthResult, Status
+    r = AuthResult(Status.SPOOF, face_brightness=[40.0, 55.0, 60.0])
+    assert r.message.startswith("visage peu éclairé")
+    assert AuthResult(Status.SPOOF, face_brightness=[120.0]).message == Status.SPOOF.value
+    assert AuthResult(Status.SPOOF).message == Status.SPOOF.value

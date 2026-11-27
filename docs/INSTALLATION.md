@@ -120,8 +120,11 @@ désactivée sur un PC portable qui voyage.
   aussitôt le champ du mot de passe.
 - **Un défi peut apparaître**, par exemple `Tournez la tête vers votre gauche`, quand
   l'image est difficile à juger. Tournez doucement la tête, puis revenez de face.
-- **Avec KDE Plasma**, la vérification démarre toute seule quand l'écran de verrouillage
-  s'affiche, et le champ du mot de passe reste disponible en même temps.
+- **Avec KDE Plasma 6**, la vérification démarre toute seule quand l'écran de
+  verrouillage s'affiche, et le champ du mot de passe reste disponible en même temps.
+- **Avec KDE Plasma 5** (Kubuntu 22.04 et 24.04), regardez la caméra et appuyez sur
+  **Entrée sans rien taper**. Si le visage n'est pas reconnu, tapez votre mot de passe :
+  il est vérifié aussitôt, sans caméra.
 - **Plusieurs bureaux installés** (GNOME et KDE, par exemple) : à l'écran de connexion,
   le visage vous connecte au dernier bureau utilisé. Pour en choisir un autre, cliquez
   sur votre nom, puis sur le **bouton clé**, choisissez le bureau avec la **roue dentée**

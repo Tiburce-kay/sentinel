@@ -360,7 +360,8 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     json_string(resp, "status", status, sizeof(status));
     /* Visage non enregistré ou non activé pour ce service : rester silencieux, le mot
      * de passe est demandé comme d'habitude. */
-    if (strcmp(status, "not_enrolled") == 0 || strcmp(status, "disabled") == 0)
+    if (strcmp(status, "not_enrolled") == 0 || strcmp(status, "disabled") == 0 ||
+        strcmp(status, "paused") == 0)
         return PAM_IGNORE;
 
     json_string(resp, "message", msg, sizeof(msg));

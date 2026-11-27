@@ -352,3 +352,21 @@ def test_deux_comptes_chacun_son_visage(service, monkeypatch):
         assert c.call("authenticate", user="alice", service="sudo")["status"] == "no_match"  # visage du frère
     # Les échecs sont comptés séparément pour chaque compte.
     assert service.store.failures("frere") == 0 and service.store.failures("alice") == 1
+
+
+def test_plasma5_pause_apres_echec_puis_reprise(service):
+    """Écran de Plasma 5 (service « kde ») : après un échec du visage, le mot de passe
+    tapé ensuite doit être vérifié sans attendre la caméra ; le visage revient ensuite."""
+    import time
+    enroll(service)
+    service.cfg.auth.pause_after_failure_s = 0.3
+    with service.client() as c:
+        service.scenes = [Shot(OTHER, 1.0)] * 20                      # échec du visage
+        assert not c.call("authenticate", service="kde")["ok"]
+        service.scenes = [Shot(ME, 1.0)] * 20
+        r = c.call("authenticate", service="kde")                     # pause : pas de caméra
+        assert r["status"] == "paused"
+        assert c.call("authenticate", service="sudo")["ok"]           # autres services : non concernés
+        time.sleep(0.35)
+        assert c.call("authenticate", service="kde")["ok"]            # pause terminée
+        assert c.call("authenticate", service="kde")["ok"]            # un succès ne met pas en pause

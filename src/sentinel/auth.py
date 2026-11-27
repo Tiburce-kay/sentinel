@@ -57,6 +57,10 @@ class Status(enum.Enum):
     POOR_IMAGE = "image du visage inexploitable"
 
 
+# Visage peu éclairé (luminosité moyenne du visage, 0-255) : le score de vivant chute
+# sur une webcam ordinaire. Valeur provisoire, à affiner avec la campagne de tests.
+DIM_FACE = 70.0
+
 # Visage vu, mais aucune image exploitable : conseil selon le motif le plus fréquent.
 ADVICE = {
     "visage trop loin ou trop petit": "visage trop loin : rapprochez-vous de la caméra",
@@ -93,6 +97,10 @@ class AuthResult:
     @property
     def message(self) -> str:
         """Message pour l'utilisateur : précis quand l'image était inexploitable."""
+        if self.status is Status.SPOOF and self.face_brightness \
+                and float(np.median(self.face_brightness)) < DIM_FACE:
+            # Refus maintenu ; le conseil évite d'accuser un vrai visage mal éclairé.
+            return "visage peu éclairé : allumez une lumière face à vous, puis réessayez"
         if self.status is Status.POOR_IMAGE and self.rejected:
             reason = max(self.rejected, key=self.rejected.get)
             return ADVICE.get(reason, f"{Status.POOR_IMAGE.value} ({reason})")

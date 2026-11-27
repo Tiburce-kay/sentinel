@@ -96,7 +96,8 @@ def test_synchronisation_des_choix_de_l_assistant(tmp_path):
         (tmp_path / name).chmod(0o644)
     sync(sudo=True, screen=False, pam_dir=tmp_path)
     assert status(tmp_path) == {"sudo": "activé", "sudo-i": "absent", "polkit-1": "absent",
-                                "gdm-password": "désactivé", "kde": "absent", "kde-fingerprint": "absent"}
+                                "gdm-password": "désactivé", "kde": "absent", "kde-fingerprint": "absent",
+                                "sddm": "absent"}
     sync(sudo=False, screen=True, pam_dir=tmp_path)
     st = status(tmp_path)
     assert st["sudo"] == "désactivé" and st["gdm-password"] == "activé"
@@ -250,3 +251,27 @@ def test_detection_de_l_ecran_de_verrouillage_kde(tmp_path):
     p.parent.mkdir(parents=True)
     p.write_text("")
     assert kde_locker_present(tmp_path)
+
+
+SDDM = """auth    requisite       pam_nologin.so
+auth    required        pam_succeed_if.so user != root quiet_success
+@include common-auth
+-auth   optional        pam_gnome_keyring.so
+-auth   optional        pam_kwallet5.so
+@include common-account
+@include common-session
+@include common-password
+"""
+
+
+def test_sddm_recoit_seulement_la_ligne_mot_de_passe_correct(tmp_path):
+    """Écran de connexion de KDE : jamais de visage (pas encore), mais la ligne « notify »,
+    sans laquelle le visage serait refusé jusqu'au premier mot de passe saisi ailleurs."""
+    from sentinel.pamconf import NOTIFY_LINE, sync
+    (tmp_path / "sddm").write_text(SDDM)
+    sync(sudo=False, screen=True, pam_dir=tmp_path, kde_locker=False)
+    lines = (tmp_path / "sddm").read_text().splitlines()
+    assert [l for l in lines if "pam_sentinel" in l] == [NOTIFY_LINE]
+    assert lines.index(NOTIFY_LINE) == lines.index("@include common-auth") + 1
+    sync(sudo=False, screen=False, pam_dir=tmp_path, kde_locker=False)
+    assert (tmp_path / "sddm").read_text() == SDDM
