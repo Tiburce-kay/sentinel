@@ -256,7 +256,9 @@ def screen_support() -> tuple[bool, bool]:
     from pathlib import Path
     pam = Path("/etc/pam.d")
     if desktop_name() == "KDE Plasma":
-        return (pam / "kde").exists(), False
+        # Plasma 5 sans /etc/pam.d/kde : le paquet le crée à l'installation (pamconf).
+        from .pamconf import kde_locker_present
+        return (pam / "kde").exists() or kde_locker_present(), False
     gdm = (pam / "gdm-password").exists() and not desktop_name()
     return gdm, gdm
 
@@ -293,18 +295,21 @@ OLD_GNOME_NOTE = ("Avec votre version de GNOME, le champ du mot de passe reste a
                   "la vérification : regardez simplement la caméra.")
 
 
-def screen_unsupported_text() -> str:
-    """Option d'écran indisponible : dire pourquoi, sans laisser croire qu'il faut
-    installer GNOME (retour d'un utilisateur de Kubuntu)."""
+def lock_unsupported_text() -> str:
+    """Écran de verrouillage indisponible : dire pourquoi, sans laisser croire qu'il faut
+    installer un autre bureau."""
     desk = desktop_name()
     where = f"avec {desk}" if desk else "avec votre bureau"
-    if desk == "KDE Plasma":
-        return ("Pas encore disponible avec KDE Plasma : la connexion au démarrage passe par "
-                "le mot de passe. Votre visage déverrouille l'écran de verrouillage et sert "
-                "aux commandes administrateur (sudo).")
-    return (f"Pas encore disponible {where} : seuls GNOME et KDE Plasma sont pris en "
-            "charge pour l'instant. Votre visage sert ici aux commandes administrateur (sudo). "
-            "Aucune installation supplémentaire n'est nécessaire.")
+    return (f"Pas encore disponible {where} : seuls GNOME et KDE Plasma sont pris en charge. "
+            "Votre visage sert ici aux commandes administrateur (sudo). Aucune installation "
+            "supplémentaire n'est nécessaire.")
+
+
+def login_unsupported_text() -> str:
+    if desktop_name() == "KDE Plasma":
+        return ("Pas encore disponible avec KDE Plasma : au démarrage, la connexion se fait "
+                "par mot de passe. Ensuite, votre visage déverrouille l'écran de verrouillage.")
+    return lock_unsupported_text()
 
 
 class PasswordRow:
@@ -558,9 +563,9 @@ class Wizard(Adw.ApplicationWindow):
             uses.add(row.row)
         self.lock_ok, self.login_ok = screen_support()
         if not self.lock_ok:
-            self.use_lock.disable(screen_unsupported_text())
+            self.use_lock.disable(lock_unsupported_text())
         if not self.login_ok:
-            self.use_login.disable(screen_unsupported_text())
+            self.use_login.disable(login_unsupported_text() if self.lock_ok else lock_unsupported_text())
         if self.lock_ok and not desktop_name() and 0 < gnome_major() < 45:
             self.use_lock.row.set_subtitle(f"Déverrouiller la session déjà ouverte. {OLD_GNOME_NOTE}")
         box.append(uses)

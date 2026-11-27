@@ -83,6 +83,8 @@ class AuthResult:
     elapsed_s: float = 0.0
     # Images où un visage était visible mais écarté par le contrôle de qualité, par motif.
     rejected: dict = field(default_factory=dict)
+    # Luminosité moyenne du visage (0 à 255) sur les images où il était visible.
+    face_brightness: list = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -235,6 +237,11 @@ class Engine:
                 if t_frame - start > a.timeout_s:
                     break
                 face = largest(self.detector.detect(frame))
+                if face is not None and isinstance(frame, np.ndarray):
+                    x, y, w, h = face.box
+                    roi = frame[max(y, 0):y + h, max(x, 0):x + w]
+                    if roi.size:
+                        result.face_brightness.append(float(roi[::4, ::4].mean()))
                 quality = self._quality(frame, face) if face is not None else None
                 dark = (quality is not None and quality.reason == "image trop sombre") or (
                     face is None and _brightness(frame) is not None and _brightness(frame) < self.cfg.quality.min_brightness)

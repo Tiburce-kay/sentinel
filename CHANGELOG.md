@@ -8,6 +8,11 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 ### Ajouté
 - **Écran de verrouillage de KDE Plasma.** Plasma 6 : essayé avec succès sur un vrai PC
   (Plasma 6.7, déverrouillage en 0,8 à 1 s). Plasma 5 : en essai.
+  - Plasma 5 (Kubuntu 22.04) : l'écran de verrouillage utilise le service PAM `kde`, que
+    la distribution ne fournit pas (PAM applique alors `other`). Sentinel le crée comme
+    copie exacte de `other`, puis le supprime à la désactivation (retour d'un testeur).
+- Journal : luminosité médiane du visage (`lumière_visage=`), pour distinguer un
+  éclairage insuffisant d'une vraie tentative d'usurpation.
   - Plasma 6 : le visage prend place dans la pile parallèle `kde-fingerprint`, juste
     avant l'empreinte digitale. Il se lance dès l'affichage de l'écran, et la pile du
     mot de passe reste intacte et disponible à tout moment.

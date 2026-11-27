@@ -198,3 +198,55 @@ def test_disposition_kde_inattendue_ignoree_sans_bloquer_le_reste(tmp_path):
     done = sync(sudo=True, screen=True, pam_dir=tmp_path)
     assert done["sudo"] == "activé" and done["kde-fingerprint"].startswith("ignoré")
     assert (tmp_path / "kde-fingerprint").read_text() == "auth required pam_unix.so\n"
+
+
+# --- Plasma 5 sans /etc/pam.d/kde (Kubuntu 22.04, retour de testeur du 27/11/2026) ---
+
+UBUNTU_OTHER = """#
+# /etc/pam.d/other - specify the PAM fallback behaviour
+#
+@include common-auth
+@include common-account
+@include common-password
+@include common-session
+"""
+
+
+def test_plasma5_kde_absent_cree_depuis_other_puis_supprime(tmp_path):
+    """kcheckpass utilise le service « kde », absent sur Kubuntu 22.04 (PAM applique
+    alors « other ») : Sentinel le crée comme copie de « other », l'active, et le
+    supprime à la désactivation, ce qui rend au système son état exact d'origine."""
+    from sentinel.pamconf import CREATED_HEADER, FACE_LINE, status, sync
+    (tmp_path / "other").write_text(UBUNTU_OTHER)
+    done = sync(sudo=False, screen=True, pam_dir=tmp_path, kde_locker=True)
+    kde = (tmp_path / "kde").read_text()
+    assert kde.startswith(CREATED_HEADER) and FACE_LINE in kde and done["kde"] == "activé"
+    assert UBUNTU_OTHER.strip().splitlines()[-1] in kde
+    assert oct((tmp_path / "kde").stat().st_mode & 0o777) == "0o644"
+    done = sync(sudo=False, screen=False, pam_dir=tmp_path, kde_locker=True)
+    assert not (tmp_path / "kde").exists() and status(tmp_path)["kde"] == "absent"
+    assert (tmp_path / "other").read_text() == UBUNTU_OTHER
+
+
+def test_pas_de_fichier_kde_cree_sans_ecran_de_verrouillage_kde(tmp_path):
+    from sentinel.pamconf import sync
+    (tmp_path / "other").write_text(UBUNTU_OTHER)
+    sync(sudo=False, screen=True, pam_dir=tmp_path, kde_locker=False)
+    assert not (tmp_path / "kde").exists()
+
+
+def test_fichier_kde_fourni_par_la_distribution_jamais_supprime(tmp_path):
+    from sentinel.pamconf import sync
+    (tmp_path / "kde").write_text(KDE)
+    sync(sudo=False, screen=True, pam_dir=tmp_path, kde_locker=True)
+    sync(sudo=False, screen=False, pam_dir=tmp_path, kde_locker=True)
+    assert (tmp_path / "kde").read_text() == KDE
+
+
+def test_detection_de_l_ecran_de_verrouillage_kde(tmp_path):
+    from sentinel.pamconf import kde_locker_present
+    assert not kde_locker_present(tmp_path)
+    p = tmp_path / "usr/lib/x86_64-linux-gnu/libexec/kcheckpass"
+    p.parent.mkdir(parents=True)
+    p.write_text("")
+    assert kde_locker_present(tmp_path)

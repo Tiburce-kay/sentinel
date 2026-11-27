@@ -305,13 +305,15 @@ class Handler(socketserver.StreamRequestHandler):
         lv = res.liveness_scores
         # Mesures numériques uniquement (aucune image) : comprendre un refus a posteriori.
         log.info("authentification user=%s service=%s résultat=%s durée=%.2fs images=%d ignorées=%d "
-                 "similarité=%.2f vivant[fenêtre max=%s, min=%s, médiane=%s, max=%s] seuil=%.2f défi=%s rejets=%s",
+                 "similarité=%.2f vivant[fenêtre max=%s, min=%s, médiane=%s, max=%s] seuil=%.2f défi=%s rejets=%s "
+                 "lumière_visage=%s",
                  user, service, res.status.name, res.elapsed_s, res.frames, res.skipped_pose,
                  res.best_similarity,
                  f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "-",
                  f"{min(lv):+.2f}" if lv else "-", f"{float(np.median(lv)):+.2f}" if lv else "-",
                  f"{max(lv):+.2f}" if lv else "-", res.liveness_threshold, res.challenge or "-",
-                 ",".join(f"{k}:{v}" for k, v in sorted(res.rejected.items(), key=lambda kv: -kv[1])) or "-")
+                 ",".join(f"{k}:{v}" for k, v in sorted(res.rejected.items(), key=lambda kv: -kv[1])) or "-",
+                 f"{float(np.median(res.face_brightness)):.0f}" if res.face_brightness else "-")
         reply = {"ok": res.ok, "status": res.status.name.lower(), "message": res.message,
                  "elapsed": round(res.elapsed_s, 2)}
         if res.ok and self.peer.is_root and use == "login" and enr.uses.get("login"):

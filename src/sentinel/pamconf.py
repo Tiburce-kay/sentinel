@@ -89,6 +89,30 @@ def enable(text: str, keyring: bool = False) -> str:
     return "\n".join(out) + "\n"
 
 
+# Plasma 5 (Kubuntu 22.04) : l'écran de verrouillage vérifie le mot de passe avec
+# kcheckpass, service PAM « kde », mais aucun paquet ne fournit /etc/pam.d/kde ; PAM
+# applique alors /etc/pam.d/other. Sentinel crée « kde » comme copie exacte de « other »
+# (même comportement), y ajoute ses lignes, et le supprime à la désactivation.
+CREATED_HEADER = ("# Créé par Sentinel : copie de /etc/pam.d/other (l'écran de verrouillage de KDE "
+                  "n'en fournit pas). Supprimé quand Sentinel est désactivé ou retiré.")
+KDE_LOCKER = ("usr/lib/*/libexec/kscreenlocker_greet", "usr/libexec/kscreenlocker_greet",
+              "usr/lib/*/libexec/kcheckpass", "usr/libexec/kcheckpass")
+
+
+def kde_locker_present(root: Path = Path("/")) -> bool:
+    return any(any(root.glob(pattern)) for pattern in KDE_LOCKER)
+
+
+def create_kde_from_other(pam_dir: Path) -> bool:
+    """Crée pam_dir/kde depuis pam_dir/other si besoin ; renvoie True s'il a été créé."""
+    kde, other = pam_dir / "kde", pam_dir / "other"
+    if kde.exists() or not other.exists():
+        return False
+    kde.write_text(f"{CREATED_HEADER}\n{other.read_text()}")
+    os.chmod(kde, 0o644)
+    return True
+
+
 def enable_parallel(text: str) -> str:
     """kde-fingerprint (Plasma 6) : visage juste avant pam_fprintd."""
     if is_enabled(text):
@@ -147,6 +171,9 @@ def apply(service: str, on: bool, pam_dir: Path = PAM_DIR) -> str:
     text = path.read_text()
     # Réactiver remplace une ancienne disposition par la disposition actuelle.
     new = layout(service, disable(text), pam_dir) if on else disable(text)
+    if not on and new.startswith(CREATED_HEADER):
+        path.unlink()
+        return "désactivé (fichier créé par Sentinel retiré)"
     if new == text:
         return "déjà activé" if on else "déjà désactivé"
     backup = path.with_name(f"{service}.sentinel-backup")
@@ -171,12 +198,17 @@ def status(pam_dir: Path = PAM_DIR) -> dict[str, str]:
 OPT_OUT = Path("/etc/sentinel/pam-desactive")
 
 
-def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR) -> dict[str, str]:
+def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR,
+         kde_locker: bool | None = None) -> dict[str, str]:
     """Applique en une fois les choix de l'assistant : sudo (et sudo -i), écrans de
     connexion et de verrouillage (GNOME : gdm-password ; KDE Plasma : kde et
     kde-fingerprint). Les services absents sont ignorés."""
     wanted = {"sudo": sudo, "sudo-i": sudo, **{svc: screen for svc in SCREEN_SERVICES}}
     done = {}
+    if kde_locker is None:
+        kde_locker = kde_locker_present()
+    if screen and kde_locker and create_kde_from_other(pam_dir):
+        done["kde (créé)"] = "copie de /etc/pam.d/other"
     for svc, on in wanted.items():
         if not (pam_dir / svc).exists():
             continue
