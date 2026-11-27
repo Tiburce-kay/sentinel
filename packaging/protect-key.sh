@@ -58,14 +58,39 @@ use_vault() {  # relie le service au coffre, avec le mode indiqué, puis redéma
     sleep "${SENTINEL_WAIT:-4}"
 }
 no_vault() { rm -f "$DROPIN"; systemctl daemon-reload; systemctl restart sentineld; }
-health() {
+health_once() {  # 0 : clé protégée valide ; 1 : échec ; 3 : service pas encore prêt
     "$PREFIX/venv/bin/python" - <<'PY'
 import sys
-from sentinel.client import Client
-r = Client("/run/sentinel/sentinel.sock", timeout=30).call("health")
+from sentinel.client import Client, ServiceError
+try:
+    r = Client("/run/sentinel/sentinel.sock", timeout=30).call("health")
+except ServiceError:
+    sys.exit(3)
 print("contrôle :", r.get("users", 0), "visage(s) déchiffré(s) avec la clé protégée")
 sys.exit(0 if r.get("ok") and r.get("key") == "coffre" else 1)
 PY
+}
+health() {
+    # Le service peut mettre plusieurs secondes à démarrer : l'ouverture de la clé par la
+    # puce TPM est lente (4,2 s mesurées sur un ThinkPad T570, 27/11/2026). On attend
+    # qu'il réponde, jusqu'à SENTINEL_HEALTH_TRIES essais espacés d'une seconde, avant
+    # de conclure ; un service tombé en échec arrête l'attente tout de suite.
+    tries="${SENTINEL_HEALTH_TRIES:-60}"
+    while :; do
+        health_once
+        code=$?
+        [ "$code" -ne 3 ] && return "$code"
+        tries=$((tries - 1))
+        if [ "$tries" -le 0 ]; then
+            echo "le service ne répond pas"
+            return 1
+        fi
+        if [ -z "${SENTINEL_FORCE_SYSTEMD:-}" ] && systemctl is-failed --quiet sentineld 2>/dev/null; then
+            echo "le service n'a pas pu démarrer avec la clé protégée"
+            return 1
+        fi
+        sleep "${SENTINEL_HEALTH_DELAY:-1}"
+    done
 }
 
 # --- Cas 1 : pas encore de coffre -> y placer la clé existante --------------------

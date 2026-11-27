@@ -3,6 +3,15 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
+## [0.2.4] — 2026-11-27
+
+### Corrigé
+- **Clé non placée dans la puce TPM lors d'une première installation.** Observé sur un
+  vrai PC : la TPM a mis 4,2 s à ouvrir la clé, et le contrôle, lancé trop tôt, a annulé
+  la protection. La clé restait dans un fichier réservé à root, sans aucune perte. Le
+  contrôle attend désormais que le service réponde (jusqu'à 60 s), et s'arrête tout de
+  suite si le service échoue.
+
 ## [0.2.3] — 2026-11-27
 
 ### Ajouté
@@ -90,6 +99,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Service `sentineld` isolé, module PAM en C, `sudo` et écran de verrouillage.
 - Assistant graphique GTK4 / libadwaita.
 
+[0.2.4]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.2
 [0.2.0]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.0

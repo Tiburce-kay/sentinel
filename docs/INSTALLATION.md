@@ -56,6 +56,10 @@ sudo apt install ./sentinel_*_amd64.deb
 Le `./` est important : il indique à `apt` d'installer ce fichier plutôt que de le
 chercher sur Internet. `apt` installe aussi les quelques composants nécessaires.
 
+À la fin, `apt` peut afficher « *Le téléchargement est effectué en dehors du bac à
+sable…* ». Ce message est sans conséquence : il indique seulement que le fichier se
+trouve dans votre dossier personnel.
+
 À la fin, un message indique comment la clé de chiffrement est protégée :
 
 | Message | Signification |

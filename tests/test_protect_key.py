@@ -149,3 +149,36 @@ def test_systemd_trop_ancien_cle_gardee_dans_le_fichier(env):
     assert "systemd < 250" in out
     assert P(env, "key").read_bytes() == P(env, "true").read_bytes()
     assert not P(env, "cred").exists() and not P(env, "dropin").exists()
+
+
+def _slow_service(env, not_ready: int):
+    """Service qui ne répond qu'après `not_ready` essais (clé ouverte lentement par la TPM)."""
+    py = Path(env["_root"]) / "prefix" / "venv" / "bin" / "python"
+    counter = Path(env["_root"]) / "essais"
+    py.write_text(f'''#!/bin/sh
+n=$(cat "{counter}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "{counter}"
+[ "$n" -le {not_ready} ] && exit 3
+''' + HEALTH.split("\n", 1)[1])
+    return counter
+
+
+def test_incident_tpm_lente_le_controle_attend_le_service(env):
+    """Installation réelle du 27/11 : la TPM a mis 4,2 s à ouvrir la clé ; le contrôle,
+    lancé trop tôt, avait annulé la protection. Il attend désormais le service."""
+    counter = _slow_service(env, not_ready=3)
+    P(env, "key").write_bytes(P(env, "true").read_bytes())
+    code, out = run(env, SENTINEL_HEALTH_DELAY="0")
+    assert code == 0, out
+    assert int(counter.read_text()) == 4
+    assert vault_key(env) == P(env, "true").read_bytes()
+    assert P(env, "dropin").exists() and not P(env, "key").exists()
+
+
+def test_service_muet_retour_a_la_cle_en_fichier(env):
+    """Service qui ne répond jamais : après les essais, retour arrière, rien de perdu."""
+    _slow_service(env, not_ready=999)
+    P(env, "key").write_bytes(P(env, "true").read_bytes())
+    code, out = run(env, SENTINEL_HEALTH_DELAY="0", SENTINEL_HEALTH_TRIES="5")
+    assert "ne répond pas" in out
+    assert P(env, "key").read_bytes() == P(env, "true").read_bytes()
+    assert not P(env, "dropin").exists()
