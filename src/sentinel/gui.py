@@ -148,9 +148,11 @@ PAM_TOOL_CANDIDATES = ("/usr/sbin/sentinel-pam", "/usr/local/sbin/sentinel-pam")
 
 
 def sync_pam(sudo: bool, screen: bool) -> str:
-    """Active ou désactive le visage pour sudo et pour l'écran de connexion, avec la
-    fenêtre standard de mot de passe administrateur (pkexec), seulement si l'état du
-    système diffère des choix. Renvoie un message pour l'utilisateur ("" si rien à dire)."""
+    """Le paquet branche Sentinel dans PAM dès l'installation : les choix de chacun sont
+    ensuite appliqués par le service, compte par compte, sans mot de passe
+    administrateur. Celui-ci n'est demandé (pkexec) que si un usage choisi a été coupé
+    pour tout le système par un administrateur. Rien n'est jamais coupé d'ici : d'autres
+    comptes peuvent utiliser leur visage. Renvoie un message ("" si rien à dire)."""
     import json
     import os
     import subprocess
@@ -160,15 +162,18 @@ def sync_pam(sudo: bool, screen: bool) -> str:
         return "Outil d'activation introuvable : réinstallez Sentinel."
     current = json.loads(subprocess.run([tool, "status", "--json"], capture_output=True,
                                         text=True, timeout=10).stdout or "{}")
-    want = {"sudo": sudo, "gdm-password": screen}
-    if all(current.get(svc, "absent") in ("absent", "activé" if on else "désactivé")
-           for svc, on in want.items()):
+    on = {svc: current.get(svc) == "activé" for svc in ("sudo", "gdm-password")}
+    need = {"sudo": sudo and current.get("sudo") == "désactivé",
+            "gdm-password": screen and current.get("gdm-password") == "désactivé"}
+    if not any(need.values()):
         return ""
-    r = subprocess.run(["pkexec", tool, "sync", "--sudo", "on" if sudo else "off",
-                        "--screen", "on" if screen else "off"], capture_output=True, text=True)
+    r = subprocess.run(["pkexec", tool, "sync",
+                        "--sudo", "on" if on["sudo"] or need["sudo"] else "off",
+                        "--screen", "on" if on["gdm-password"] or need["gdm-password"] else "off"],
+                       capture_output=True, text=True)
     if r.returncode in (126, 127):
-        return ("Activation non effectuée (mot de passe administrateur annulé ou refusé). "
-                "Vous pouvez réessayer avec « Modifier mes réglages ».")
+        return ("Sentinel a été désactivé sur ce PC par un administrateur. Son mot de passe "
+                "est nécessaire pour le réactiver : réessayez avec « Modifier mes réglages ».")
     if r.returncode != 0:
         return f"Activation impossible : {(r.stderr or r.stdout).strip()}"
     return ""
@@ -697,8 +702,8 @@ class Wizard(Adw.ApplicationWindow):
                         enable_lockscreen_button(uses["lockscreen"])
                     except Exception:  # noqa: BLE001 — confort, jamais bloquant
                         pass
-                    # Activation dans le système (sudo, écran de connexion) : fenêtre
-                    # standard de mot de passe administrateur si un changement est nécessaire.
+                    # Sentinel est branché dans PAM par le paquet : rien à faire, sauf
+                    # s'il a été désactivé par un administrateur (voir sync_pam).
                     self.finish_button.set_sensitive(False)
                     in_thread(lambda: sync_pam(uses["sudo"], uses["lockscreen"] or uses["login"]),
                               self._after_pam)

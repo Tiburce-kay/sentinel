@@ -109,3 +109,27 @@ def test_sudo_i_qui_inclut_sudo_est_ignore(tmp_path):
     (tmp_path / "sudo-i").write_text("#%PAM-1.0\n@include sudo\n")
     done = sync(sudo=True, screen=False, pam_dir=tmp_path)
     assert done["sudo"] == "activé" and done["sudo-i"].startswith("ignoré")
+
+
+def test_desactivation_par_l_administrateur_respectee_par_les_mises_a_jour(tmp_path):
+    """Le paquet active Sentinel à chaque installation ou mise à jour (--from-package),
+    sauf si un administrateur l'a désactivé ; le retrait du paquet ne compte pas comme
+    une désactivation volontaire."""
+    from sentinel.pamconf import main, status
+    pam = tmp_path / "pam.d"
+    pam.mkdir()
+    (pam / "sudo").write_text(DEBIAN_SUDO)
+    marker = tmp_path / "pam-desactive"
+    cli = lambda *a: main(["sync", *a, "--pam-dir", str(pam), "--opt-out", str(marker)])
+    assert cli("--sudo", "on", "--screen", "on", "--from-package") == 0       # installation
+    assert status(pam)["sudo"] == "activé"
+    assert cli("--sudo", "off", "--screen", "off", "--from-package") == 0     # retrait du paquet
+    assert status(pam)["sudo"] == "désactivé" and not marker.exists()
+    assert cli("--sudo", "on", "--screen", "on", "--from-package") == 0       # réinstallation
+    assert status(pam)["sudo"] == "activé"
+    assert cli("--sudo", "off", "--screen", "off") == 0                       # l'administrateur coupe
+    assert marker.exists()
+    assert cli("--sudo", "on", "--screen", "on", "--from-package") == 0       # mise à jour
+    assert status(pam)["sudo"] == "désactivé"                                 # choix respecté
+    assert cli("--sudo", "on", "--screen", "off") == 0                        # l'administrateur réactive
+    assert status(pam)["sudo"] == "activé" and not marker.exists()

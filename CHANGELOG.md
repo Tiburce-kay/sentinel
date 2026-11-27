@@ -11,7 +11,13 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   licence de l'auteur. Le texte de la licence est installé avec le paquet
   (`/usr/share/doc/sentinel/copyright`).
 
-Aucun changement de fonctionnement par rapport à la 0.2.2.
+### Changé
+- **Un seul mot de passe dans l'assistant.** Le paquet branche Sentinel dans PAM à
+  l'installation. C'est sans effet tant qu'un compte n'a ni visage enregistré ni usage
+  choisi, et chaque utilisateur active ses usages avec son seul mot de passe. La fenêtre
+  de mot de passe administrateur n'apparaît plus que si un administrateur a désactivé
+  Sentinel pour tout le PC (`sentinel-pam sync --sudo off --screen off`, choix conservé
+  lors des mises à jour).
 
 ## [0.2.2] — 2026-11-27
 

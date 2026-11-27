@@ -3,7 +3,7 @@
 #
 #   scripts/test-deb-docker.sh ubuntu:24.04 dist/sentinel_0.2.0-1~ubuntu24.04_amd64.deb
 #
-# Vérifie : installation par apt (dépendances résolues), activation via sentinel-pam,
+# Vérifie : installation par apt (dépendances résolues), branchement PAM par le paquet,
 # vrai sudo (bon puis mauvais mot de passe), assistant graphique, puis retrait :
 # PAM restauré et sudo TOUJOURS fonctionnel au mot de passe, enfin purge des données.
 set -eu
@@ -45,8 +45,9 @@ ok "$(/opt/sentinel/venv/bin/python -I /src/scripts/smoke-ia.py)"
 
 echo "=== 2. activation et vrai sudo"
 useradd -m alice && echo 'alice:Bon-Mdp-42' | chpasswd && usermod -aG sudo alice
-sentinel-pam sync --sudo on --screen off >/dev/null || fail "sentinel-pam sync"
-[ "$(grep -c pam_sentinel /etc/pam.d/sudo)" = 2 ] || fail "activation PAM"
+# Le paquet branche Sentinel lui-même : l'assistant n'a plus besoin du mot de passe
+# administrateur. Sans visage enregistré, sudo marche exactement comme avant.
+[ "$(grep -c pam_sentinel /etc/pam.d/sudo)" = 2 ] || fail "branchement PAM par le paquet"
 SENTINEL_CONFIG=/etc/sentinel/config.toml /opt/sentinel/venv/bin/sentineld > /tmp/d.log 2>&1 &
 for i in $(seq 120); do grep -q prêt /tmp/d.log 2>/dev/null && break; sleep 0.25; done
 grep -q prêt /tmp/d.log || { cat /tmp/d.log; fail "démarrage du service"; }
@@ -59,6 +60,14 @@ apt-get install --reinstall -y "$DEB" > /tmp/up.log 2>&1 || { tail -20 /tmp/up.l
 [ "$(grep -c pam_sentinel /etc/pam.d/sudo)" = 2 ] || fail "mise à jour : Sentinel désactivé dans PAM"
 su alice -c "echo Bon-Mdp-42 | sudo -S -k -p '' true" 2>/dev/null || fail "sudo après mise à jour"
 ok "après mise à jour : toujours activé dans PAM, sudo fonctionne"
+
+echo "=== 2c. désactivation par un administrateur : respectée par les mises à jour"
+sentinel-pam sync --sudo off --screen off >/dev/null || fail "désactivation"
+apt-get install --reinstall -y "$DEB" > /tmp/up2.log 2>&1 || { tail -20 /tmp/up2.log; fail "réinstallation"; }
+grep -q pam_sentinel /etc/pam.d/sudo && fail "la mise à jour a réactivé Sentinel malgré l'administrateur"
+sentinel-pam sync --sudo on --screen off >/dev/null || fail "réactivation"
+[ "$(grep -c pam_sentinel /etc/pam.d/sudo)" = 2 ] || fail "réactivation PAM"
+ok "désactivation de l'administrateur respectée, réactivation possible"
 
 echo "=== 3. assistant graphique"
 GTK_IM_MODULE=gtk-im-context-simple GSK_RENDERER=cairo GDK_BACKEND=x11 timeout 60 \

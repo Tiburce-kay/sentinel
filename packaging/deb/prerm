@@ -6,7 +6,7 @@ set -e
 case "$1" in
     remove|deconfigure)
         if [ -x /usr/sbin/sentinel-pam ]; then
-            /usr/sbin/sentinel-pam sync --sudo off --screen off >/dev/null 2>&1 || true
+            /usr/sbin/sentinel-pam sync --sudo off --screen off --from-package >/dev/null 2>&1 || true
             /usr/sbin/sentinel-pam disable polkit-1 >/dev/null 2>&1 || true
         fi
         if [ -d /run/systemd/system ]; then

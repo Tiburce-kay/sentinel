@@ -13,6 +13,7 @@ esac
 if [ "$1" = "purge" ]; then
     rm -rf /var/lib/sentinel /etc/systemd/system/sentineld.service.d
     rm -f /etc/credstore.encrypted/sentinel-master-key /etc/credstore.encrypted/sentinel-master-key.mode
+    rm -f /etc/sentinel/pam-desactive
     [ -d /run/systemd/system ] && systemctl daemon-reload || true
 fi
 exit 0

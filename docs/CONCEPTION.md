@@ -125,9 +125,15 @@ Il n'y a donc pas d'intervalle entre vérification et utilisation (TOCTOU).
    Limite assumée : un attaquant déjà root sur la machine allumée peut le déchiffrer ;
    la clé scellée dans la TPM empêche en revanche de le lire depuis une copie du disque.
 3. **Après 5 échecs consécutifs**, le visage est refusé jusqu'au prochain mot de passe.
-4. **Activation explicite** : l'installation du paquet n'active rien ; l'utilisateur
-   choisit les usages dans l'assistant, puis confirme avec le mot de passe
-   administrateur. Le retrait du paquet restaure PAM **avant** de supprimer les fichiers.
+4. **Consentement à deux niveaux.** L'administrateur qui installe le paquet (avec
+   `sudo`) branche Sentinel dans PAM. Ce branchement est **sans effet** pour un compte
+   qui n'a pas enregistré son visage, ou pour un usage qu'il n'a pas choisi : le service
+   répond « non enregistré » ou « désactivé », et le module se tait. Chaque utilisateur
+   choisit ensuite ses usages avec **son propre mot de passe**. Ces choix sont chiffrés
+   avec son gabarit, et personne d'autre ne peut les modifier sans la clé.
+   Un administrateur peut tout couper (`sentinel-pam sync --sudo off --screen off`), et
+   ce choix est respecté par les mises à jour. Le retrait du paquet restaure PAM
+   **avant** de supprimer les fichiers.
 5. **Aucune nouvelle clé là où des données existent**, et la clé du coffre n'est jamais
    remplacée (incident du 27/11/2026, `CHANGELOG.md`).
 

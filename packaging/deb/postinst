@@ -4,6 +4,12 @@ set -e
 if [ "$1" = "configure" ]; then
     # Écran de connexion (GDM, Debian/Ubuntu) : recompile ses réglages (extension).
     [ -x /usr/share/gdm/generate-config ] && /usr/share/gdm/generate-config >/dev/null 2>&1 || true
+    # Branche Sentinel dans PAM (sudo, écran de connexion). Sans effet tant qu'un compte
+    # n'a pas enregistré son visage et choisi ses usages dans l'assistant : le module se
+    # tait et le mot de passe est demandé comme avant. Une désactivation volontaire par
+    # un administrateur (/etc/sentinel/pam-desactive) est respectée.
+    /usr/sbin/sentinel-pam sync --sudo on --screen on --from-package >/dev/null || \
+        echo "Sentinel : branchement PAM non effectué ; le mot de passe fonctionne comme avant."
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload
         systemctl enable sentineld >/dev/null 2>&1 || true

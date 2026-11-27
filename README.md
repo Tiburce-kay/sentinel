@@ -48,8 +48,8 @@ part de ces faiblesses documentées ([conception](docs/CONCEPTION.md)).
   s'ouvre lors d'une connexion par le visage (option).
 - **Plusieurs comptes** : chacun son visage. Plusieurs webcams : la bonne est retrouvée,
   et une caméra infrarouge n'est prise qu'en dernier recours.
-- **Assistant graphique** : aucune commande à taper, activation par la fenêtre
-  d'administration habituelle.
+- **Assistant graphique** : aucune commande à taper, et un seul mot de passe, le vôtre,
+  pour confirmer vos choix.
 - **Journal des tentatives refusées**, avec des mesures, jamais d'image.
 
 ## Installation

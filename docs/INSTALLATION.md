@@ -49,8 +49,9 @@ chercher sur Internet. `apt` installe aussi les quelques composants nécessaires
 | `clé protégée : puce TPM 2.0 + secret du système` | protection maximale : la clé ne peut pas être lue depuis un autre PC |
 | `clé protégée : secret du système` | pas de TPM 2.0 utilisable ; la clé reste chiffrée et réservée à root |
 
-**Rien n'est encore activé** : `sudo` et l'écran de connexion fonctionnent comme avant
-tant que vous n'avez pas terminé l'assistant.
+**Rien ne change encore** : Sentinel est branché sur `sudo` et l'écran de connexion,
+mais il reste inactif pour chaque compte tant que la personne n'a pas enregistré son
+visage et choisi ses usages. D'ici là, le mot de passe est demandé exactement comme avant.
 
 ## 4. Enregistrer votre visage
 
@@ -60,7 +61,7 @@ Ouvrez **Sentinel** depuis le menu des applications, puis cliquez sur **Commence
 |---|---|
 | ![](images/assistant-welcome.png) | **Accueil** : cliquez sur *Commencer*. |
 | ![](images/assistant-capture.png) | **Enregistrement** : l'écran devient blanc pour bien éclairer votre visage. Regardez la caméra, puis tournez **doucement** la tête dans la direction demandée : face, gauche, droite, haut, bas. Le cercle se remplit. |
-| ![](images/assistant-confirm.png) | **Choix** : choisissez où utiliser votre visage, saisissez votre mot de passe, puis cliquez sur *Terminer*. Une fenêtre demande ensuite le mot de passe administrateur pour activer ces choix dans le système. |
+| ![](images/assistant-confirm.png) | **Choix** : choisissez où utiliser votre visage, saisissez votre mot de passe, puis cliquez sur *Terminer*. Ce mot de passe prouve que c'est bien vous : personne ne peut enregistrer son visage sur votre compte. |
 | ![](images/assistant-done.png) | **Terminé**. |
 
 **Conseils pour l'enregistrement :** soyez de face, à 40-60 cm de l'écran, sans
@@ -161,6 +162,9 @@ coup, depuis un terminal :
 ```bash
 sudo /usr/sbin/sentinel-pam sync --sudo off --screen off
 ```
+
+Ce choix vaut pour tous les comptes du PC et il est conservé lors des mises à jour.
+Pour réactiver : `sudo /usr/sbin/sentinel-pam sync --sudo on --screen on`.
 
 Si la session graphique est inaccessible : **Ctrl+Alt+F3**, connexion avec votre nom
 d'utilisateur et votre mot de passe, la commande ci-dessus, puis **Ctrl+Alt+F1** (ou

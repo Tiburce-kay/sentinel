@@ -1,8 +1,14 @@
 """Activation de Sentinel dans la configuration PAM d'un service (sudo, écran…).
 
     sentinel-pam status
+    sentinel-pam sync --sudo on|off --screen on|off
     sentinel-pam enable sudo
     sentinel-pam disable sudo
+
+Le paquet branche Sentinel à l'installation (sync on/on). C'est sans effet pour un
+compte qui n'a pas enregistré son visage, ou pour un usage qu'il n'a pas choisi : le
+service répond « non enregistré » ou « désactivé », et le module se tait. Chaque
+utilisateur choisit ses usages avec son seul mot de passe.
 
 Deux lignes, marquées « # sentinel », sont ajoutées autour de l'inclusion du mot de
 passe (disposition Debian/Ubuntu : « @include common-auth ») :
@@ -116,6 +122,12 @@ def status(pam_dir: Path = PAM_DIR) -> dict[str, str]:
     return out
 
 
+# Désactivation volontaire par un administrateur (« sentinel-pam sync --sudo off
+# --screen off ») : retenue ici, pour que les mises à jour du paquet ne réactivent pas
+# Sentinel. Le retrait du paquet (--from-package) ne la crée pas.
+OPT_OUT = Path("/etc/sentinel/pam-desactive")
+
+
 def sync(sudo: bool, screen: bool, pam_dir: Path = PAM_DIR) -> dict[str, str]:
     """Applique en une fois les choix de l'assistant : sudo (et sudo -i), écran de
     connexion et de verrouillage (gdm-password). Les services absents sont ignorés."""
@@ -142,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sudo", choices=("on", "off"), help="sync : visage pour sudo")
     ap.add_argument("--screen", choices=("on", "off"), help="sync : visage pour l'écran de connexion")
     ap.add_argument("--json", action="store_true", help="status : sortie JSON")
+    ap.add_argument("--from-package", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--opt-out", type=Path, default=OPT_OUT, help=argparse.SUPPRESS)
     ap.add_argument("--pam-dir", type=Path, default=PAM_DIR, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.action == "status":
@@ -160,8 +174,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "sync":
             if args.sudo is None or args.screen is None:
                 ap.error("sync demande --sudo on|off et --screen on|off")
-            for svc, result in sync(args.sudo == "on", args.screen == "on", args.pam_dir).items():
+            on = (args.sudo == "on", args.screen == "on")
+            if args.from_package and any(on) and args.opt_out.exists():
+                # Installation ou mise à jour : un administrateur a désactivé Sentinel.
+                print(f"Sentinel reste désactivé (voir {args.opt_out}).")
+                return 0
+            for svc, result in sync(*on, args.pam_dir).items():
                 print(f"{svc} : {result}")
+            if not args.from_package:
+                if any(on):
+                    args.opt_out.unlink(missing_ok=True)
+                elif args.opt_out.parent.is_dir():
+                    args.opt_out.write_text("Sentinel désactivé par un administrateur "
+                                            "(sentinel-pam sync --sudo off --screen off).\n")
             return 0
         if not args.service:
             ap.error("préciser le service, par exemple : sudo")
