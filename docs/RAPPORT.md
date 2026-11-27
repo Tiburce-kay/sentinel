@@ -194,10 +194,13 @@ fenêtre glisse, et il suffit qu'une seule soit acceptée.
   - le service de bout en bout sur un vrai socket ;
   - les 8 scénarios du coffre à clé, dont un incident réel de réinstallation ;
   - le choix entre plusieurs webcams.
-- **Paquet testé à chaque version** en conteneur vierge, sur Ubuntu 24.04, Debian 13 et
-  Kali : installation, calcul réel des trois modèles, `sudo`, mise à jour, assistant
-  graphique, retrait (PAM restauré, `sudo` au mot de passe) et purge. Le refus de
-  l'installation est vérifié sur Ubuntu 22.04 et Debian 12.
+- **Paquet testé à chaque version** en conteneur vierge, sur Ubuntu 22.04 et 24.04,
+  Debian 12 et 13, et Kali : installation, calcul réel des trois modèles, `sudo`, mise à
+  jour, assistant graphique, retrait (PAM restauré, `sudo` au mot de passe) et purge. Le
+  refus de l'installation est vérifié sur Ubuntu 20.04 et Debian 11, et le test vérifie
+  qu'aucun bureau n'est installé avec Sentinel.
+- **Essais réels** sur un ThinkPad T570 : écran de verrouillage et connexion GNOME 50,
+  écran de verrouillage KDE Plasma 6.7 (déverrouillage en 0,8 à 1 s).
 
 ## 6. Discussion et limites
 

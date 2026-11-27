@@ -12,8 +12,9 @@
    cat dist/rapport.txt
    ```
    Chaque ligne doit indiquer `OK` :
-   - `RÉSULTAT PAQUET` pour Ubuntu 24.04, Debian 13 et Kali ;
-   - `REFUS` pour Ubuntu 22.04 et Debian 12, qui doivent rester refusés.
+   - `RÉSULTAT PAQUET` pour Ubuntu 22.04 et 24.04, Debian 12 et 13, et Kali ;
+   - `BUREAU NON TIRÉ` : aucun bureau ni écran de connexion installé avec Sentinel ;
+   - `REFUS` pour Ubuntu 20.04 et Debian 11, qui doivent rester refusés.
 4. Essayer sur un vrai PC ou en machine virtuelle ce que les conteneurs ne peuvent pas
    tester : écran de verrouillage, connexion au démarrage, bouton clé, TPM.
 5. Publier :

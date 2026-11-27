@@ -6,7 +6,8 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 ## [Non publié]
 
 ### Ajouté
-- **Écran de verrouillage de KDE Plasma** (en cours d'essai).
+- **Écran de verrouillage de KDE Plasma.** Plasma 6 : essayé avec succès sur un vrai PC
+  (Plasma 6.7, déverrouillage en 0,8 à 1 s). Plasma 5 : en essai.
   - Plasma 6 : le visage prend place dans la pile parallèle `kde-fingerprint`, juste
     avant l'empreinte digitale. Il se lance dès l'affichage de l'écran, et la pile du
     mot de passe reste intacte et disponible à tout moment.
@@ -14,6 +15,11 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   - Une disposition KDE inattendue est ignorée, sans rien bloquer.
   - Assistant : l'écran de verrouillage est proposé sous KDE Plasma ; la connexion au
     démarrage (SDDM) viendra ensuite.
+- **Retour d'Ubuntu 22.04 et Debian 12, pour tous les bureaux.** Le paquet est fabriqué
+  sur Ubuntu 22.04. Sous GNOME 42 à 44, tout fonctionne, mais le champ du mot de passe
+  reste affiché pendant la vérification, ce que l'assistant signale. Ubuntu 20.04 et
+  Debian 11 sont refusés.
+- Guide : comment choisir son bureau à la connexion quand plusieurs sont installés.
 - `scripts/diagnostic-bureau.sh` : diagnostic en lecture seule du bureau et de ses
   fichiers PAM, pour préparer la prise en charge d'un nouveau bureau.
 

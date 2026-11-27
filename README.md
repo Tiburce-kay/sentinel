@@ -73,11 +73,19 @@ d'urgence).
 
 ### Compatibilité
 
-| Système | `sudo` | Écran de verrouillage et connexion | Champ masqué et bouton clé |
-|---|---|---|---|
-| Ubuntu 24.04+, Debian 13+, Kali (GNOME 45 à 51) | ✅ | ✅ | ✅ |
-| Mêmes distributions avec un autre bureau (KDE Plasma, Xfce, Cinnamon), par exemple Kubuntu | ✅ | — (prévu pour KDE Plasma) | — |
-| Ubuntu 22.04, Debian 12 et plus anciennes, processeurs ARM | installation refusée par `apt` | | |
+Un seul paquet pour toute la famille Debian **à partir d'Ubuntu 22.04 et Debian 12**
+(Kubuntu, Kali, Linux Mint, Zorin…). Il s'adapte au bureau :
+
+| Bureau | `sudo` | Écran de verrouillage | Connexion au démarrage | Champ masqué, bouton clé |
+|---|---|---|---|---|
+| GNOME 45 et plus (Ubuntu 24.04+, Debian 13+, Kali) | ✅ | ✅ | ✅ | ✅ |
+| GNOME 42 à 44 (Ubuntu 22.04, Debian 12) | ✅ | ✅ | ✅ | — le champ reste affiché |
+| KDE Plasma 6 (Kubuntu 25.04+, Debian 13, Kali) | ✅ | ✅ vérification lancée toute seule, mot de passe toujours disponible | prévu | — |
+| KDE Plasma 5 (Kubuntu 22.04 et 24.04) | ✅ | 🧪 en essai | prévu | — |
+| Autres bureaux (Xfce, Cinnamon…) | ✅ | — | — | — |
+
+Sur Ubuntu 20.04, Debian 11 ou plus ancien, ou sur un processeur ARM, `apt` refuse
+l'installation sans rien modifier.
 
 - Il faut un PC 64 bits, une webcam et systemd. La puce TPM 2.0 est facultative, mais
   recommandée.

@@ -8,8 +8,7 @@ visage.
 
 | Il faut | Comment vérifier |
 |---|---|
-| Ubuntu 24.04 ou plus récent, Debian 13 ou plus récent, ou Kali | Paramètres → À propos, ou `cat /etc/os-release` |
-| Bureau GNOME 45 ou plus récent | Paramètres → À propos, ou `gnome-shell --version` |
+| Ubuntu 22.04 ou plus récent (Kubuntu compris), Debian 12 ou plus récent, ou Kali | Paramètres → À propos, ou `cat /etc/os-release` |
 | PC 64 bits (Intel ou AMD) | `uname -m` affiche `x86_64` |
 | Une webcam (intégrée ou USB) | — |
 | Facultatif : puce TPM 2.0, pour une protection maximale de la clé | `cat /sys/class/tpm/tpm0/tpm_version_major` affiche `2` |
@@ -17,10 +16,16 @@ visage.
 Si votre système est trop ancien, l'installation est simplement refusée : rien n'est
 modifié.
 
-**Avec un autre bureau que GNOME** (KDE Plasma, Xfce, Cinnamon…), Sentinel fonctionne
-pour `sudo`. L'écran de connexion et l'écran de verrouillage restent au mot de passe :
-l'assistant grise ces options. **N'installez pas GNOME pour autant** : rien d'autre
-n'est nécessaire. La prise en charge de KDE Plasma est prévue.
+Ce que Sentinel fait dépend de votre bureau, que l'assistant détecte tout seul :
+
+| Bureau | Ce qui fonctionne par le visage |
+|---|---|
+| GNOME 45 ou plus récent | `sudo`, écran de verrouillage, connexion au démarrage, avec le champ du mot de passe masqué et un bouton clé |
+| GNOME 42 à 44 (Ubuntu 22.04, Debian 12) | la même chose, mais le champ du mot de passe reste affiché pendant la vérification |
+| KDE Plasma | `sudo` et écran de verrouillage ; la connexion au démarrage passe par le mot de passe |
+| Autres bureaux (Xfce, Cinnamon…) | `sudo` |
+
+**N'installez pas d'autre bureau pour Sentinel** : rien d'autre n'est nécessaire.
 
 ## 2. Télécharger le paquet
 
@@ -115,6 +120,13 @@ désactivée sur un PC portable qui voyage.
   aussitôt le champ du mot de passe.
 - **Un défi peut apparaître**, par exemple `Tournez la tête vers votre gauche`, quand
   l'image est difficile à juger. Tournez doucement la tête, puis revenez de face.
+- **Avec KDE Plasma**, la vérification démarre toute seule quand l'écran de verrouillage
+  s'affiche, et le champ du mot de passe reste disponible en même temps.
+- **Plusieurs bureaux installés** (GNOME et KDE, par exemple) : à l'écran de connexion,
+  le visage vous connecte au dernier bureau utilisé. Pour en choisir un autre, cliquez
+  sur votre nom, puis sur le **bouton clé**, choisissez le bureau avec la **roue dentée**
+  en bas à droite, puis saisissez votre mot de passe. Votre choix est retenu pour les
+  connexions suivantes.
 
 ### Le mot de passe reste toujours possible
 

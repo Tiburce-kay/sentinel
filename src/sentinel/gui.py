@@ -274,6 +274,25 @@ def desktop_name() -> str:
     return ""
 
 
+def gnome_major() -> int:
+    """Version majeure de GNOME Shell (0 si absent ou illisible)."""
+    import re
+    import subprocess
+    try:
+        out = subprocess.run(["gnome-shell", "--version"], capture_output=True, text=True,
+                             timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    m = re.search(r"(\d+)", out)
+    return int(m.group(1)) if m else 0
+
+
+# GNOME 42 à 44 (Ubuntu 22.04, Debian 12) : l'extension (champ masqué, bouton clé) exige
+# GNOME 45 ; le visage fonctionne, le champ du mot de passe reste simplement affiché.
+OLD_GNOME_NOTE = ("Avec votre version de GNOME, le champ du mot de passe reste affiché pendant "
+                  "la vérification : regardez simplement la caméra.")
+
+
 def screen_unsupported_text() -> str:
     """Option d'écran indisponible : dire pourquoi, sans laisser croire qu'il faut
     installer GNOME (retour d'un utilisateur de Kubuntu)."""
@@ -542,6 +561,8 @@ class Wizard(Adw.ApplicationWindow):
             self.use_lock.disable(screen_unsupported_text())
         if not self.login_ok:
             self.use_login.disable(screen_unsupported_text())
+        if self.lock_ok and not desktop_name() and 0 < gnome_major() < 45:
+            self.use_lock.row.set_subtitle(f"Déverrouiller la session déjà ouverte. {OLD_GNOME_NOTE}")
         box.append(uses)
         self.confirm_group = confirm = Adw.PreferencesGroup(
             title="Confirmation",

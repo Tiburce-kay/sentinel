@@ -3,9 +3,9 @@
 #   scripts/build-all-debs.sh            -> dist/sentinel_<version>-1_amd64.deb + dist/rapport.txt
 set -u
 cd "$(dirname "$0")/.."
-IMAGES="${IMAGES:-ubuntu:24.04 debian:13 kalilinux/kali-rolling:latest}"
-# Distributions trop anciennes (GNOME < 45) : apt doit REFUSER le paquet.
-REFUSED="${REFUSED:-ubuntu:22.04 debian:12}"
+IMAGES="${IMAGES:-ubuntu:22.04 ubuntu:24.04 debian:12 debian:13 kalilinux/kali-rolling:latest}"
+# Distributions trop anciennes : apt doit REFUSER le paquet.
+REFUSED="${REFUSED:-ubuntu:20.04 debian:11}"
 mkdir -p dist
 : > dist/rapport.txt
 scripts/build-deb.sh > dist/fabrication.log 2>&1
