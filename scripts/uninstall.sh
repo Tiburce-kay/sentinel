@@ -15,7 +15,6 @@ if [ -d /run/systemd/system ]; then
 fi
 rm -f /etc/systemd/system/sentineld.service
 rm -rf /etc/systemd/system/sentineld.service.d
-rm -f /etc/credstore.encrypted/sentinel-master-key /etc/credstore.encrypted/sentinel-master-key.mode
 [ -d /run/systemd/system ] && systemctl daemon-reload || true
 for d in /usr/lib/x86_64-linux-gnu/security /lib/x86_64-linux-gnu/security \
          /usr/lib/aarch64-linux-gnu/security /lib/security /usr/lib/security /usr/lib64/security; do
@@ -29,9 +28,11 @@ if [ -e /usr/share/gdm/dconf/95-sentinel ]; then
 fi
 rm -rf /opt/sentinel /usr/share/sentinel /usr/share/gnome-shell/extensions/sentinel@tiburce-kay.github.io
 if [ "${1:-}" = "--keep-data" ]; then
-    echo "Données conservées : /var/lib/sentinel et /etc/sentinel"
+    echo "Données conservées : /var/lib/sentinel, /etc/sentinel et la clé (/etc/credstore.encrypted)"
 else
     rm -rf /var/lib/sentinel /etc/sentinel
-    echo "Données de visage supprimées."
+    # La clé n'a de sens qu'avec les données : supprimée avec elles, jamais sans.
+    rm -f /etc/credstore.encrypted/sentinel-master-key /etc/credstore.encrypted/sentinel-master-key.mode
+    echo "Données de visage et clé de chiffrement supprimées."
 fi
 echo "Sentinel est désinstallé."

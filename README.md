@@ -35,17 +35,20 @@ documentées : voir [`docs/CONCEPTION.md`](docs/CONCEPTION.md).
 
 ## Installation (Debian, Ubuntu, Kali)
 
-Testée de bout en bout dans des conteneurs vierges — installation, suite de tests complète,
-assistant graphique, vrai `sudo` avec le module PAM, désinstallation
-(`scripts/test-install-docker.sh [image]`) :
+**Le plus simple :** téléchargez le paquet de votre distribution dans les
+[Releases](https://github.com/Tiburce-kay/sentinel/releases), puis double-cliquez dessus,
+ou :
 
-| Distribution | Python | libadwaita / GTK | Résultat |
-|---|---|---|---|
-| Ubuntu 22.04 (et Mint 21, Zorin 17…) | 3.10 | 1.1 / 4.6 | ✅ |
-| Ubuntu 24.04 (et Mint 22…) | 3.12 | 1.5 / 4.14 | ✅ |
-| Debian 12 | 3.11 | 1.2 / 4.8 | ✅ |
-| Debian 13 | 3.13 | 1.7 / 4.18 | ✅ |
-| Kali rolling | 3.14 | 1.10 / 4.24 | ✅ |
+```bash
+sudo apt install ./sentinel_0.2.0-1~ubuntu24.04_amd64.deb
+```
+
+Lancez ensuite **Sentinel** depuis le menu des applications : l'assistant enregistre votre
+visage, puis active la reconnaissance pour `sudo` et l'écran de connexion (mot de passe
+administrateur demandé). Retirer : `sudo apt remove sentinel` (données conservées) ou
+`sudo apt purge sentinel` (données et clé effacées).
+
+**Depuis les sources** (développement) :
 
 ```bash
 git clone <url-du-depot> sentinel && cd sentinel
