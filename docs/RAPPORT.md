@@ -1,6 +1,6 @@
 # Sentinel : authentification faciale locale et résistante à l'usurpation sur webcam ordinaire
 
-*Rapport technique, version 0.2.5 (novembre 2026).*
+*Rapport technique, version 0.3.0 (novembre 2026).*
 
 ## Résumé
 
@@ -22,9 +22,13 @@ Il combine quatre éléments :
   puce TPM 2.0.
 
 Sur le matériel de développement (ThinkPad T570, webcam 640×480 sans infrarouge),
-aucune des 324 images de photo présentée sur téléphone ni la vidéo n'ont produit de
-fenêtre acceptée, et aucune autre personne n'a été reconnue (similarité ≤ 0,32 contre
-≥ 0,69 pour l'utilisateur). L'utilisateur est authentifié en **1,2 à 1,4 s**. Ces
+aucune autre personne n'a été reconnue (similarité ≤ 0,32 contre ≥ 0,69 pour
+l'utilisateur). **La texture seule s'est révélée insuffisante** : une photo sur
+téléphone, écran au maximum, a obtenu des scores de vivant proches d'un vrai visage et
+déverrouillé `sudo` (version 0.2.5). Depuis la 0.3.0, le défi avec contrôle du relief
+est exigé à chaque vérification. Une photo plate ne peut pas le relever (démonstration
+par le calcul, section 5.6), et les 6 attaques réelles suivantes ont été refusées.
+L'utilisateur est authentifié en **2,1 à 2,6 s**, défi compris. Ces
 résultats portent sur **une seule personne et une seule webcam**. Un protocole de
 campagne à plusieurs personnes (ISO/IEC 30107-3) et son outillage sont fournis pour
 les généraliser.
@@ -201,6 +205,43 @@ fenêtre glisse, et il suffit qu'une seule soit acceptée.
   qu'aucun bureau n'est installé avec Sentinel.
 - **Essais réels** sur un ThinkPad T570 : écran de verrouillage et connexion GNOME 50,
   écran de verrouillage KDE Plasma 6.7 (déverrouillage en 0,8 à 1 s).
+
+### 5.6 Attaque par photo et défi systématique (28/11/2026)
+
+**Attaque réussie (version 0.2.5).** Une photo de l'utilisateur, affichée sur un
+téléphone à luminosité maximale à 20-30 cm (visage de 73 px de large), a obtenu des
+fenêtres de vivant de +1,77 et +1,86, contre +2,4 en médiane pour le vrai visage. Elle a
+été acceptée 2 fois sur 3, sans défi, car le score n'était pas jugé ambigu.
+L'hypothèse est qu'à cette distance, les indices de texture d'un écran (pixels, reflets)
+sont trop petits pour la webcam. La calibration du 25/11, faite avec des photos plus
+proches, ne l'avait pas révélé.
+
+**Correction.** Le défi est exigé à chaque vérification, et la taille minimale du visage
+passe à 110 px.
+
+**Pourquoi une photo ne peut pas relever le défi.** Le défi exige, sur les mêmes images,
+une rotation mesurée (déplacement du nez entre les yeux) d'au moins 0,10 et un relief
+(écart du nez au plan des yeux et de la bouche) d'au moins 0,05. Simulation d'une photo
+plate grandeur nature tournée devant la caméra, en perspective :
+
+| Distance | Rotation | Rotation mesurée, photo plate | Rotation mesurée, vrai visage | Relief, photo plate |
+|---|---|---|---|---|
+| 15 cm | 25° | 0,042 | 0,291 | 0,030 |
+| 15 cm | 60° | **0,087** | 0,917 | 0,064 |
+| 30 cm | 60° | 0,043 | 0,853 | 0,031 |
+
+Même dans le pire cas (photo grandeur nature à 15 cm, tournée à 60°), la rotation mesurée
+reste sous le seuil. Une photo réelle, plus petite qu'un visage, est encore plus loin du
+seuil.
+
+**Vérification réelle (version 0.3.0).** 3 vrais essais acceptés, avec un défi relevé à
+chaque fois, en 2,1 à 2,6 s. 6 attaques par photo refusées : visage trop petit, photo
+trop inclinée ou délai écoulé. Aucune n'a même atteint le défi.
+
+**Limite.** Une **vidéo** de l'utilisateur qui tourne la tête possède un vrai relief.
+Contre elle, Sentinel compte sur la texture (scores bas pour les vidéos mesurées), le sens
+tiré au sort (une chance sur deux par essai) et le blocage après 5 échecs. Une suite de
+deux gestes tirés au sort renforcerait cette défense.
 
 ## 6. Discussion et limites
 

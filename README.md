@@ -6,7 +6,7 @@ Déverrouillez `sudo`, l'écran de verrouillage et la session au démarrage en r
 votre webcam, sans caméra infrarouge, sans cloud et sans jamais perdre l'accès par mot
 de passe.
 
-![Version](https://img.shields.io/badge/version-0.2.5-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![Plateforme](https://img.shields.io/badge/Ubuntu%2024.04%2B%20%C2%B7%20Debian%2013%2B%20%C2%B7%20Kali-GNOME%2045%2B-orange)
 ![Tests](https://img.shields.io/badge/tests-191%20r%C3%A9ussis-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-PolyForm%20Noncommercial%201.0.0-lightgrey)
@@ -81,7 +81,7 @@ Un seul paquet pour toute la famille Debian **à partir d'Ubuntu 22.04 et Debian
 | GNOME 45 et plus (Ubuntu 24.04+, Debian 13+, Kali) | ✅ | ✅ | ✅ | ✅ |
 | GNOME 42 à 44 (Ubuntu 22.04, Debian 12) | ✅ | ✅ | ✅ | — le champ reste affiché |
 | KDE Plasma 6 (Kubuntu 25.04+, Debian 13, Kali) | ✅ | ✅ vérification lancée toute seule, mot de passe toujours disponible | prévu | — |
-| KDE Plasma 5 (Kubuntu 22.04 et 24.04) | ✅ | 🧪 en essai | prévu | — |
+| KDE Plasma 5 (Kubuntu 22.04 et 24.04) | ✅ | ✅ regarder la caméra puis Entrée, champ vide | prévu | — |
 | Autres bureaux (Xfce, Cinnamon…) | ✅ | — | — | — |
 
 Sur Ubuntu 20.04, Debian 11 ou plus ancien, ou sur un processeur ARM, `apt` refuse
@@ -124,12 +124,19 @@ Mesures sur un ThinkPad T570, avec une webcam 640×480 sans infrarouge
 
 | Mesure | Résultat |
 |---|---|
-| Utilisateur authentifié | 9 essais sur 9, en **1,2 à 1,4 s** |
+| Utilisateur authentifié | à chaque essai, en **2,1 à 2,6 s** défi compris (1,2 à 1,4 s sans défi) |
 | Autre personne | refusée (similarité ≤ 0,32, contre ≥ 0,69 pour l'utilisateur) |
-| Photo et vidéo sur téléphone | **aucune fenêtre acceptée** (324 images de photo) |
+| Photo sur téléphone | **refusée** depuis la 0.3.0 (6 attaques réelles), grâce au défi systématique |
+| Vidéo sur téléphone | refusée lors des essais ; protection partielle (voir les limites) |
 | Calcul | ~150 ms par image sur un i5-6300U (2016) |
 
-Ces chiffres portent sur une personne et une webcam. Une **campagne à plusieurs
+**Transparence :** le 28/11/2026, une photo affichée sur un téléphone, écran au maximum,
+a trompé le modèle de texture et déverrouillé `sudo` sur la version 0.2.5. Depuis la
+0.3.0, un **défi** (tourner la tête, direction tirée au sort, contrôle du relief) est
+exigé à chaque vérification. Une photo, plate, ne peut pas le relever : c'est démontré
+par le calcul et vérifié sur 6 attaques réelles ([CALIBRATION.md](docs/CALIBRATION.md)).
+
+Ces chiffres portent sur une à deux personnes et deux webcams. Une **campagne à plusieurs
 personnes** est prête, avec un outil intégré (`sentinel campagne`), un protocole
 ISO/IEC 30107-3 et un formulaire de consentement : [docs/CAMPAGNE.md](docs/CAMPAGNE.md).
 

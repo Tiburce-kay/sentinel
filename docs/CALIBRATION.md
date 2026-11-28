@@ -141,3 +141,24 @@ la lumière du visage.
 **À étudier :** compensation de contre-jour de la webcam (réglage UVC « backlight
 compensation ») ou normalisation de la luminosité du visage, à valider d'abord contre
 des photos et vidéos d'attaque avant toute mise en service.
+
+## Attaque par photo et défi systématique (28/11/2026)
+
+Mesures avec `scripts/mesure_lumiere.py` (nombres seulement), même PC :
+
+| Présentation | Images | Largeur du visage | Lumière | Fenêtre de vivant (min / méd / max) |
+|---|---|---|---|---|
+| Utilisateur, lumière de face | 234 | — | 118 | +0,65 / +2,38 / +3,65 |
+| Utilisateur, pénombre | 230 | 189 px | 49 | +0,84 / +1,75 / +3,16 |
+| Photo sur téléphone, écran au maximum, tête de l'utilisateur hors champ | 233 | 73 px | 194 | −2,22 / −0,60 / **+1,48** |
+| Photo, écran au minimum | 24 | — | 77 | −6,39 / −5,78 / −5,02 |
+| Vidéo sur téléphone | 107 | — | 113 | −8,07 / −6,67 / −0,60 |
+
+Avec `sudo`, la photo (écran au maximum) a été acceptée 2 fois sur 3, avec des fenêtres de
++1,77 et +1,86. **La texture seule ne sépare pas une photo lumineuse d'un vrai visage**
+sur cette webcam. Correction : défi à chaque vérification, et visage d'au moins 110 px.
+Analyse et vérification : docs/RAPPORT.md, section 5.6.
+
+Éclaircir le visage avant l'analyse (correction gamma vers 110/255) n'apporte rien de
+décisif : il baisse le vrai visage en pénombre (+1,75 → +0,37) et monte la photo (+1,48 →
++2,67 au maximum). Cette piste est abandonnée.

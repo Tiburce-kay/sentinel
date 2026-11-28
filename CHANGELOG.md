@@ -3,7 +3,7 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 numérotation [SemVer](https://semver.org/lang/fr/).
 
-## [Non publié]
+## [0.3.0] — 2026-11-28
 
 ### Sécurité
 - **Faille corrigée : une photo sur téléphone pouvait déverrouiller `sudo`.** Constatée
@@ -53,7 +53,7 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - `scripts/diagnostic-bureau.sh` : diagnostic en lecture seule du bureau et de ses
   fichiers PAM, pour préparer la prise en charge d'un nouveau bureau.
 
-## [0.2.5] — 2026-11-27
+## [0.2.5] — 2026-11-27 — ⚠️ paquet retiré (faille : photo sur téléphone acceptée)
 
 ### Corrigé
 - **Installer Sentinel sur un PC sans GNOME tirait GNOME Shell et GDM.** Signalé sous
@@ -168,7 +168,8 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 - Service `sentineld` isolé, module PAM en C, `sudo` et écran de verrouillage.
 - Assistant graphique GTK4 / libadwaita.
 
-[0.2.5]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.2.5
+[0.3.0]: https://github.com/Tiburce-kay/sentinel/releases/tag/v0.3.0
+[0.2.5]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.5
 [0.2.4]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.4
 [0.2.3]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.3
 [0.2.2]: https://github.com/Tiburce-kay/sentinel/tree/v0.2.2
