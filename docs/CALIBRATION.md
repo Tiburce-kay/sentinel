@@ -107,3 +107,36 @@ ordinaires (terminal, sans écran blanc) :
 
 Calcul : ~120 ms par image de face sur i5-6300U ; la caméra n'attend presque jamais.
 Les lenteurs observées plus tôt (3,3 à 3,8 s) venaient d'un processeur occupé (vidéo).
+
+## Deuxième utilisateur, autre webcam (27-28/11/2026)
+
+Premier testeur extérieur : ThinkPad sous Kubuntu 22.04 (KDE Plasma 5.24), webcam
+intégrée. Enregistrement fait avec l'assistant, sous écran blanc. Seuil personnel
+calculé : −1,26. Données issues du journal du service : aucune image.
+
+| Moment | Essais | Similarité | Meilleure fenêtre de vivant | Lumière du visage (0-255) | Résultat |
+|---|---|---|---|---|---|
+| Soir (22h39-22h41) | 6 | 0,62 – 0,70 | −2,99 à −2,16 | non mesurée | 4 « usurpation », 1 défi échoué, 1 succès après défi |
+| Jour (13h02-13h03) | 4 | 0,73 – 0,77 | −2,79 à −1,73 | 59 – 69 | 3 « usurpation », 1 défi échoué |
+| Jour (13h10) | 1 | 0,69 | −1,57 | 79 | succès après défi |
+
+**Constats :**
+1. **La reconnaissance tient** (similarité ≥ 0,62, contre ≤ 0,32 pour d'autres personnes
+   chez le premier utilisateur).
+2. **Le score de vivant de ce vrai visage est nettement plus bas** que chez le premier
+   utilisateur, et suit la **lumière du visage** : 59-69 donne des refus, 79 un succès.
+   Même en plein jour, le visage reste sombre. Hypothèse : la webcam règle son exposition
+   sur toute l'image, avec une source de lumière derrière la personne. Un biais du
+   modèle selon les visages n'est pas exclu, et la campagne devra le mesurer.
+3. **L'écran blanc de l'enregistrement surestime les scores** : le seuil personnel
+   (−1,26) était plus strict que les conditions réelles ne le permettaient.
+
+**Mesures prises (0.3.0) :** la vérification de l'assistant se fait sans écran blanc,
+et le seuil personnel en tient compte (−2,0 au plus bas, plancher inchangé) ; conseil
+d'éclairage quand le visage est sombre ; luminosité du visage au journal. Sous ce
+nouveau seuil, 4 des 11 essais ci-dessus seraient acceptés directement, et 3 autres
+passeraient par un défi.
+
+**À étudier :** compensation de contre-jour de la webcam (réglage UVC « backlight
+compensation ») ou normalisation de la luminosité du visage, à valider d'abord contre
+des photos et vidéos d'attaque avant toute mise en service.

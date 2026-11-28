@@ -606,8 +606,9 @@ class Wizard(Adw.ApplicationWindow):
 
     def _show(self, name: str) -> None:
         self.stack.set_visible_child_name(name)
-        # Capture et vérification : plein écran blanc, pour éclairer le visage.
-        lit = name in ("capture", "verify")
+        # Capture : plein écran blanc, pour éclairer le visage. La vérification se fait
+        # sans, dans les conditions réelles d'usage, qui servent au seuil personnel.
+        lit = name == "capture"
         if lit:
             self.view.add_css_class("lit")
             self.fullscreen()

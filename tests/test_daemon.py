@@ -370,3 +370,52 @@ def test_plasma5_pause_apres_echec_puis_reprise(service):
         time.sleep(0.35)
         assert c.call("authenticate", service="kde")["ok"]            # pause terminée
         assert c.call("authenticate", service="kde")["ok"]            # un succès ne met pas en pause
+
+
+def test_seuil_personnel_recalibre_dans_les_conditions_reelles(service):
+    """Retour de testeur (28/11) : enregistrement sous écran blanc -> seuil −1,26, mais
+    au quotidien ses fenêtres de vivant sont plus basses. La vérification, faite sans
+    écran blanc, abaisse le seuil, jamais sous le plancher validé."""
+    with service.client() as c:
+        list(c.stream("enroll_start", preview=False))
+        service.scenes = [Shot(ME, -1.8)] * 20                       # visage réel, moins éclairé
+        r = c.call("enroll_verify")
+        assert r["ok"], r
+        assert c.call("enroll_commit", password=PASSWORD, uses={})["ok"]
+    t = service.store.load("alice").liveness_threshold
+    assert t == service.cfg.liveness.floor                           # −1,8 − 0,5 borné à −2,0
+
+
+def test_verification_dans_le_noir_refusee_sans_abaisser_sous_le_plancher(service):
+    with service.client() as c:
+        list(c.stream("enroll_start", preview=False))
+        service.scenes = [Shot(ME, -4.0)] * 20                       # comme une photo
+        r = c.call("enroll_verify")
+        assert not r["ok"] and r["status"] == "spoof"
+
+
+def test_client_parti_pendant_une_erreur_sans_erreur_interne(service, caplog, capfd):
+    """Assistant fermé avant la réponse « mot de passe incorrect » : pas de trace
+    d'« erreur interne » dans le journal (vu chez un testeur le 28/11)."""
+    import logging
+    import socket
+    caplog.set_level(logging.ERROR, logger="sentineld")
+    enroll(service)
+    c = service.client()
+    c.sock.sendall(b'{"op": "set_uses", "password": "faux", "uses": {}}\n')
+    c.sock.shutdown(socket.SHUT_RDWR)
+    c.sock.close()
+    import time
+    time.sleep(1.0)
+    assert not [r for r in caplog.records if "erreur interne" in r.getMessage()]
+    assert "BrokenPipeError" not in capfd.readouterr().err
+
+
+def test_seuil_realiste_unitaire():
+    from sentinel.config import Config
+    from sentinel.daemon import realistic_threshold
+    cfg = Config()
+    assert realistic_threshold(-1.26, [0.0] * 5, cfg) == -1.26                    # trop peu d'images
+    assert abs(realistic_threshold(-1.26, [-1.2] * 20, cfg) - -1.7) < 1e-9        # −1,2 − 0,5
+    assert realistic_threshold(-1.26, [-3.0] * 20, cfg) == cfg.liveness.floor     # jamais sous −2
+    assert realistic_threshold(-1.26, [2.0] * 20, cfg) == -1.26                   # jamais plus strict

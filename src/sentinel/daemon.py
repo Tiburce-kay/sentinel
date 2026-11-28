@@ -43,6 +43,19 @@ MAX_LINE = 64 * 1024
 log = logging.getLogger("sentineld")
 
 # Service PAM -> usage. Un service inconnu est toujours refusé.
+def realistic_threshold(enroll_threshold: float, scores: list[float], cfg) -> float:
+    """Seuil personnel tenant compte des conditions réelles (vérification sans écran
+    blanc). L'enregistrement, très bien éclairé, surestime les scores de vivant : on
+    garde le plus bas des deux seuils, toujours borné par le plancher validé (une photo
+    ou une vidéo restent refusées au même niveau)."""
+    lc, k = cfg.liveness, cfg.auth.window_frames
+    if len(scores) < k:
+        return enroll_threshold
+    means = [float(np.mean(scores[i:i + k])) for i in range(len(scores) - k + 1)]
+    real = float(np.percentile(means, 10)) - lc.calibration_margin
+    return float(np.clip(min(enroll_threshold, real), lc.floor, lc.ceiling))
+
+
 # Piles où le visage passe avant le mot de passe à chaque tentative (Plasma 5).
 PAUSE_SERVICES = ("kde",)
 
@@ -186,16 +199,22 @@ class Handler(socketserver.StreamRequestHandler):
                     raise Refused("error", f"opération inconnue : {op!r}")
                 fn(req)
             except Refused as r:
-                self.send({"ok": False, "status": r.status, "message": r.message})
+                reply = {"ok": False, "status": r.status, "message": r.message}
             except (ValueError, StoreError) as exc:
-                self.send({"ok": False, "status": "error", "message": str(exc) or "requête invalide"})
+                reply = {"ok": False, "status": "error", "message": str(exc) or "requête invalide"}
             except (BrokenPipeError, ConnectionResetError):
                 return
             except CameraError as exc:
-                self.send({"ok": False, "status": "camera", "message": str(exc)})
+                reply = {"ok": False, "status": "camera", "message": str(exc)}
             except Exception:  # noqa: BLE001 — le service ne doit jamais tomber
                 log.exception("erreur interne")
-                self.send({"ok": False, "status": "error", "message": "erreur interne"})
+                reply = {"ok": False, "status": "error", "message": "erreur interne"}
+            else:
+                continue
+            try:
+                self.send(reply)
+            except (BrokenPipeError, ConnectionResetError):
+                return  # le client est parti (assistant fermé) : rien à signaler
 
     # --- Autorisations ---------------------------------------------------------
 
@@ -434,13 +453,28 @@ class Handler(socketserver.StreamRequestHandler):
         out = self.pending["outcome"]
         if not st.camera_lock.acquire(blocking=False):
             raise Refused("busy", "caméra déjà utilisée par Sentinel")
+        lc = cfg.liveness
         try:
             with st.open_camera(self.pending.get("camera")) as cam:
+                # Vérification dans les conditions réelles d'usage (sans l'écran blanc de
+                # l'enregistrement) : on accepte dès le plancher validé, puis on recalibre.
                 res = st.get_engine().authenticate(cam.frames(cfg.auth.timeout_s), out.embeddings,
-                                                   out.liveness_threshold, out.stats.get("reference_pose"))
+                                                   lc.floor, out.stats.get("reference_pose"))
         finally:
             st.camera_lock.release()
-        self.send({"ok": res.ok, "status": res.status.name.lower(), "message": res.message,
+        threshold = out.liveness_threshold
+        if lc.enabled:
+            threshold = realistic_threshold(out.liveness_threshold, res.liveness_scores, cfg)
+        ok = res.ok and (not lc.enabled or res.window_liveness >= threshold)
+        self.pending["liveness_threshold"] = threshold
+        log.info("vérification d'enrôlement résultat=%s vivant[fenêtre max=%s] seuil enregistrement=%.2f "
+                 "seuil retenu=%.2f lumière_visage=%s", res.status.name,
+                 f"{res.window_liveness:+.2f}" if res.window_liveness > float("-inf") else "-",
+                 out.liveness_threshold, threshold,
+                 f"{float(np.median(res.face_brightness)):.0f}" if res.face_brightness else "-")
+        status = res.status if ok or not res.ok else Status.SPOOF
+        message = res.message if status is res.status else Status.SPOOF.value
+        self.send({"ok": ok, "status": status.name.lower(), "message": message,
                    "elapsed": round(res.elapsed_s, 2)})
 
     def op_enroll_commit(self, req: dict) -> None:
@@ -453,7 +487,8 @@ class Handler(socketserver.StreamRequestHandler):
         uses = req.get("uses") or {}
         out = self.pending["outcome"]
         enr = Enrollment(user=user, embeddings=out.embeddings, camera=self.pending["camera"],
-                         liveness_threshold=out.liveness_threshold, stats=out.stats,
+                         liveness_threshold=self.pending.get("liveness_threshold", out.liveness_threshold),
+                         stats=out.stats,
                          uses={k: bool(uses.get(k, v)) for k, v in DEFAULT_USES.items()})
         st.store.save(enr)
         self._sync_secret(enr, str(req.get("password", "")))

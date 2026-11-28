@@ -18,6 +18,11 @@ numérotation [SemVer](https://semver.org/lang/fr/).
   - Écran de connexion de KDE (SDDM) : ajout de la seule ligne « mot de passe
     correct », jamais du visage. Sans elle, après un démarrage par SDDM, le visage était
     refusé (« mot de passe requis ») jusqu'au premier mot de passe saisi ailleurs.
+- **Seuil personnel calibré dans les conditions réelles** : la vérification de
+  l'assistant se fait sans écran blanc, et le seuil retenu est le plus bas des deux,
+  sans jamais passer sous le plancher validé (−2,0). Avec l'écran blanc, le seuil d'un
+  testeur valait −1,26, trop strict pour son éclairage habituel (docs/CALIBRATION.md).
+- Assistant fermé pendant une réponse d'erreur : plus de trace d'erreur dans le journal.
 - Refus « usurpation » avec un visage peu éclairé : le message conseille d'allumer une
   lumière face à soi. Le refus est maintenu.
 - Journal : luminosité médiane du visage (`lumière_visage=`), pour distinguer un
