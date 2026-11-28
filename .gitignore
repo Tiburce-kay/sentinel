@@ -11,3 +11,4 @@ dev-data/
 pam/pam_sentinel.so
 pam/pam-harness
 dist/
+mesures-lumiere.csv
