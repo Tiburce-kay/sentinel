@@ -134,8 +134,9 @@ calculé : −1,26. Données issues du journal du service : aucune image.
 **Mesures prises (0.3.0) :** la vérification de l'assistant se fait sans écran blanc,
 et le seuil personnel en tient compte (−2,0 au plus bas, plancher inchangé) ; conseil
 d'éclairage quand le visage est sombre ; luminosité du visage au journal. Sous ce
-nouveau seuil, 4 des 11 essais ci-dessus seraient acceptés directement, et 3 autres
-passeraient par un défi.
+nouveau seuil, 6 des 11 essais ci-dessus passeraient par un défi (4 avec l'ancien) et
+5 resteraient refusés : l'amélioration est réelle mais modeste. Le levier principal reste
+la lumière du visage.
 
 **À étudier :** compensation de contre-jour de la webcam (réglage UVC « backlight
 compensation ») ou normalisation de la luminosité du visage, à valider d'abord contre
