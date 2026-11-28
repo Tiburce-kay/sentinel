@@ -55,12 +55,12 @@ def record(label: str, seconds: float) -> None:
             face = max(faces, key=lambda f: f.area)
             b = face_brightness(frame, face)
             rows.append((label, round(b, 1), round(live.score(frame, face), 3),
-                         round(live.score(brighten(frame, b), face), 3)))
+                         round(live.score(brighten(frame, b), face), 3), len(faces), face.box[2]))
     new = not OUT.exists()
     with OUT.open("a", newline="") as fh:
         w = csv.writer(fh)
         if new:
-            w.writerow(["etiquette", "lumiere_visage", "vivant_brut", "vivant_eclairci"])
+            w.writerow(["etiquette", "lumiere_visage", "vivant_brut", "vivant_eclairci", "visages", "largeur"])
         w.writerows(rows)
     print(f"{len(rows)} images avec visage enregistrées (nombres seulement) dans {OUT}")
 
@@ -74,10 +74,13 @@ def report() -> None:
     with OUT.open() as fh:
         for r in csv.DictReader(fh):
             data.setdefault(r["etiquette"], []).append(r)
-    print(f"{'étiquette':<14}{'images':>7}{'lumière':>9}   {'fenêtre brute (min/méd/max)':<30}{'fenêtre éclaircie (min/méd/max)'}")
+    print(f"{'étiquette':<14}{'images':>7}{'2 visages+':>11}{'largeur':>9}{'lumière':>9}   "
+          f"{'fenêtre brute (min/méd/max)':<30}{'fenêtre éclaircie (min/méd/max)'}")
     for label, rows in data.items():
         lum = np.median([float(r["lumiere_visage"]) for r in rows])
-        out = [f"{label:<14}{len(rows):>7}{lum:>9.0f}   "]
+        multi = sum(1 for r in rows if int(r.get("visages") or 1) > 1)
+        width = np.median([float(r.get("largeur") or 0) for r in rows])
+        out = [f"{label:<14}{len(rows):>7}{multi:>11}{width:>9.0f}{lum:>9.0f}   "]
         for key in ("vivant_brut", "vivant_eclairci"):
             ws = windows([float(r[key]) for r in rows])
             out.append(f"{min(ws):+.2f} / {np.median(ws):+.2f} / {max(ws):+.2f}".ljust(30) if ws else "—".ljust(30))
