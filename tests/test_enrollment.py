@@ -234,10 +234,29 @@ def challenge_engine(direction="gauche"):
 T1 = np.stack([ME])
 
 
-def test_vivant_sans_ambiguite_aucun_defi():
+def test_vivant_eleve_sans_defi_si_defi_systematique_desactive():
     asked = []
-    r = challenge_engine().authenticate([Shot(ME, 3.0)] * 15, T1, on_challenge=asked.append)
+    e = challenge_engine()
+    e.cfg.liveness.challenge_always = False
+    r = e.authenticate([Shot(ME, 3.0)] * 15, T1, on_challenge=asked.append)
     assert r.ok and asked == [] and r.challenge == ""
+
+
+def test_attaque_du_28_11_photo_au_score_de_vivant_eleve_refusee():
+    """Attaque réelle : photo sur téléphone, écran au maximum, à 20-30 cm ; le modèle
+    de texture lui a donné +1,8 (vrai visage : +2,4) et sudo a été déverrouillé. Avec
+    le défi systématique, la photo, plate, ne produit pas de relief : refus."""
+    from tests.head import FLAT
+    seq = [Shot(ME, 1.8, FLAT)] * 10 + [Shot(ME, 1.8, FLAT, yaw_deg=45)] * 40
+    r = challenge_engine("gauche").authenticate(seq, T1, on_challenge=lambda m: None)
+    assert not r.ok and r.status.name == "CHALLENGE_FAILED"
+
+
+def test_vrai_visage_au_score_eleve_relève_le_defi_systematique():
+    asked = []
+    seq = [Shot(ME, 3.0)] * 10 + [Shot(ME, 3.0, yaw_deg=25)] * 5
+    r = challenge_engine("gauche").authenticate(seq, T1, on_challenge=asked.append)
+    assert asked == ["Tournez la tête vers votre gauche"] and r.ok and r.challenge == "gauche"
 
 
 def test_score_limite_defi_reussi_dans_le_bon_sens():

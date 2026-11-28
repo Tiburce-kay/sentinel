@@ -297,7 +297,7 @@ class Engine:
                 result.window_liveness = max(result.window_liveness, mean)
                 can_challenge = use_live and lc.challenge and on_challenge is not None
                 if mean >= live_t:
-                    if can_challenge and mean < live_t + lc.challenge_margin:
+                    if can_challenge and (lc.challenge_always or mean < live_t + lc.challenge_margin):
                         # Réussite « limite » : on demande un geste imprévisible avant
                         # d'accepter (voir _challenge).
                         challenge_ref = last_pts

@@ -62,6 +62,12 @@ class LivenessConfig:
     # Défi adaptatif : si la moyenne de vivant dépasse le seuil de moins de cette marge,
     # Sentinel demande de tourner la tête (direction tirée au sort) avant d'accepter.
     challenge: bool = True
+    # Défi SYSTÉMATIQUE (28/11/2026) : une photo sur téléphone, présentée à 20-30 cm,
+    # écran au maximum, a obtenu des fenêtres de vivant de +1,8 (vrai visage : +2,4) et
+    # déverrouillé sudo. La texture seule ne suffit pas sur une webcam ordinaire : le
+    # geste imprévisible avec contrôle du relief (une photo est plate) est exigé à
+    # chaque fois. Voir docs/CALIBRATION.md.
+    challenge_always: bool = True
     challenge_margin: float = 1.0
     # Zone grise sous le seuil : défi plutôt que refus, jusqu'à 1,0 sous le seuil et
     # jamais sous -2,5 (pire fenêtre d'attaque mesurée : -3,45 ; voir CALIBRATION.md).
@@ -81,7 +87,10 @@ class LivenessConfig:
 
 @dataclass
 class QualityConfig:
-    min_face_px: int = 90           # largeur minimale du visage, en pixels
+    # Largeur minimale du visage, en pixels (image 640×480). 110 depuis le 28/11/2026 :
+    # la photo qui a trompé le modèle de vivant mesurait 73 px ; un vrai visage devant
+    # un PC portable en mesure 150 à 200.
+    min_face_px: int = 110
     min_sharpness: float = 40.0     # variance du laplacien
     min_brightness: float = 40.0
     max_brightness: float = 220.0

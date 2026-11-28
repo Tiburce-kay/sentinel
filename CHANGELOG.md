@@ -5,6 +5,17 @@ numérotation [SemVer](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Sécurité
+- **Faille corrigée : une photo sur téléphone pouvait déverrouiller `sudo`.** Constatée
+  le 28/11/2026 sur matériel réel. Photo affichée écran au maximum, à 20-30 cm : le
+  modèle de texture lui a donné +1,8 (vrai visage : +2,4), et la photo a été acceptée
+  2 fois sur 3. Corrections :
+  - **défi systématique** : tourner la tête dans une direction tirée au sort, avec
+    contrôle du relief, à chaque vérification. Une photo est plate et ne peut pas le
+    relever ;
+  - taille minimale du visage portée à 110 px (la photo mesurait 73 px) ;
+  - test reproduisant l'attaque.
+
 ### Ajouté
 - **Écran de verrouillage de KDE Plasma.** Plasma 6 : essayé avec succès sur un vrai PC
   (Plasma 6.7, déverrouillage en 0,8 à 1 s). Plasma 5 : en essai.

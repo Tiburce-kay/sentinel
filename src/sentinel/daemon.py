@@ -314,7 +314,9 @@ class Handler(socketserver.StreamRequestHandler):
                     cam.frames(cfg.auth.timeout_s + cfg.auth.challenge_timeout_s), enr.embeddings,
                     enr.liveness_threshold, enr.stats.get("reference_pose"),
                     should_abort=lambda: st.skip_pending(user),
-                    on_challenge=challenge if req.get("progress") else None)
+                    # Toujours fourni : le défi est exigé même si le client n'affiche pas
+                    # les messages (il échouera alors, faute de geste).
+                    on_challenge=challenge)
         finally:
             st.camera_lock.release()
             st.consume_skip(user)

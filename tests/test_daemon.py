@@ -48,6 +48,9 @@ def enrollment_scenes():
 def service(tmp_path, monkeypatch):
     cfg = Config(data_dir=tmp_path / "store", strict_permissions=False)
     cfg.auth.require_password_after_boot = False
+    # Ces tests portent sur les autorisations du service : défi systématique désactivé
+    # ici, et testé à part (test_defi_systematique_exige_par_le_service, test_enrollment).
+    cfg.liveness.challenge_always = False
     engine = Engine(cfg, Detector(), Recognizer(), Liveness(), quality=lambda fr, f: Quality(True))
     state = d.State(cfg, engine)
     state.store.init()
@@ -419,3 +422,17 @@ def test_seuil_realiste_unitaire():
     assert abs(realistic_threshold(-1.26, [-1.2] * 20, cfg) - -1.7) < 1e-9        # −1,2 − 0,5
     assert realistic_threshold(-1.26, [-3.0] * 20, cfg) == cfg.liveness.floor     # jamais sous −2
     assert realistic_threshold(-1.26, [2.0] * 20, cfg) == -1.26                   # jamais plus strict
+
+
+
+def test_defi_systematique_exige_par_le_service(service):
+    """Défi exigé même pour un client qui n'affiche pas les consignes : sans geste,
+    pas de succès, quel que soit le score de vivant."""
+    enroll(service)
+    service.cfg.liveness.challenge_always = True
+    service.engine.choose = lambda options: "gauche"
+    service.scenes = [Shot(ME, 3.0)] * 40                                    # immobile
+    with service.client() as c:
+        assert c.call("authenticate", service="sudo")["status"] == "challenge_failed"
+        service.scenes = [Shot(ME, 3.0)] * 10 + [Shot(ME, 3.0, yaw_deg=25)] * 5  # tourne
+        assert c.call("authenticate", service="sudo")["ok"]
